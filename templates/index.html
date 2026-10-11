@@ -639,10 +639,16 @@
             }
         }
 
+        let isCycleInProgress = false;
+
         async function runStudyCycle(specificTopic = null) {
+            if (isCycleInProgress) return;
+            isCycleInProgress = true;
             const btn = document.querySelector('.btn-trigger');
-            btn.disabled = true;
-            btn.innerText = '⏳ Pesquisando & Debatendo...';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '⏳ Pesquisando & Debatendo...';
+            }
             try {
                 const res = await fetch('/api/run_cycle', {
                     method: 'POST',
@@ -650,22 +656,33 @@
                     body: JSON.stringify({ topic: specificTopic })
                 });
                 const result = await res.json();
-                if (result.error) {
+                if (result.error && specificTopic) {
                     alert(result.error);
                 } else {
                     switchTab('feed');
                     await loadData();
                 }
             } catch (err) {
-                alert("Erro ao executar ciclo de estudo.");
+                console.error("Erro no ciclo:", err);
             } finally {
-                btn.disabled = false;
-                btn.innerText = '✨ Executar Ciclo de Estudo';
+                isCycleInProgress = false;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '✨ Executar Ciclo de Estudo';
+                }
             }
         }
 
         loadData();
-        setInterval(loadData, 10000);
+        // Atualiza a tela a cada 6 segundos
+        setInterval(loadData, 6000);
+
+        // Disparo autônomo contínuo a cada 45 segundos enquanto a aba estiver aberta
+        setInterval(() => {
+            if (!isPaused && !isCycleInProgress) {
+                runStudyCycle();
+            }
+        }, 45000);
     </script>
 </body>
 </html>

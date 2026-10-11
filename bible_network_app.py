@@ -5,8 +5,14 @@ import time
 import random
 import requests
 import threading
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from flask import Flask, render_template, jsonify, request
+
+def get_brazil_time_str():
+    # Horário Oficial de Brasília (UTC-3)
+    br_tz = timezone(timedelta(hours=-3))
+    return datetime.now(br_tz).strftime('%d/%m/%Y %H:%M:%S')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "database", "bible_data.json")
@@ -345,21 +351,17 @@ def shutdown():
     threading.Thread(target=stop_server).start()
     return jsonify({"success": True, "message": "Servidor sendo desligado com segurança."})
 
-@app.route('/api/run_cycle', methods=['POST'])
-def run_cycle():
+def execute_study_cycle_internal(selected_topic=None):
     global is_paused
     if is_paused:
-        return jsonify({"error": "O servidor está pausado."}), 400
+        return {"error": "O servidor está pausado."}
 
     db = load_db()
     agents = db.get("agents", [])
     topics = db.get("topics", [])
     
-    req_data = request.get_json() if request.is_json else {}
-    selected_topic = req_data.get("topic") if req_data else None
-    
     if not agents or not topics:
-        return jsonify({"error": "Nenhum agente ou pauta configurada"}), 400
+        return {"error": "Nenhum agente ou pauta configurada"}
         
     author = random.choice(agents)
     topic = selected_topic if selected_topic and selected_topic in topics else random.choice(topics)
@@ -369,7 +371,7 @@ def run_cycle():
     past_posts = db.get("posts", [])
     res = ai_engine.generate_theological_post(author, topic, past_posts)
     
-    timestamp = time.strftime('%d/%m/%Y %H:%M:%S')
+    timestamp = get_brazil_time_str()
     post_id = f"study_{int(time.time())}"
     
     commenting_agents = random.sample([a for a in agents if a["id"] != author["id"]], 2)
@@ -413,19 +415,25 @@ def run_cycle():
         for c in comments:
             f.write(f"### @{c['agent_name']}:\n{c['content']}\n\n")
             
-    return jsonify({"success": True, "post": new_post})
+    return {"success": True, "post": new_post}
 
+@app.route('/api/run_cycle', methods=['POST'])
+def run_cycle():
+    req_data = request.get_json() if request.is_json else {}
+    selected_topic = req_data.get("topic") if req_data else None
+    result = execute_study_cycle_internal(selected_topic)
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
 
 def background_generation_loop():
     import time
-    import requests
     while True:
-        time.sleep(30)
+        time.sleep(60)
         global is_paused
         if not is_paused:
             try:
-                server_port = int(os.environ.get("PORT", 5005))
-                requests.post(f"http://127.0.0.1:{server_port}/api/run_cycle", json={"topic": None}, timeout=180)
+                execute_study_cycle_internal()
             except Exception as e:
                 print(f"[Loop] Erro ao disparar ciclo: {e}")
 
