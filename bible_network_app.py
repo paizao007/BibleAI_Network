@@ -366,6 +366,7 @@ def execute_study_cycle_internal(selected_topic=None):
     if not agents or not topics:
         return {"error": "Nenhum agente ou pauta configurada"}
         
+    author = random.choice(agents)
     past_posts = db.get("posts", [])
     
     # 1. Garante que se o usuário escolheu uma pauta específica, ela seja respeitada
