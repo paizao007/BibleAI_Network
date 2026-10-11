@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: bibleai-network
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn bible_network_app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHONIOENCODING
+        value: utf-8
+      - key: ACTIVE_ENGINE
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
