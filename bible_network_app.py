@@ -35,28 +35,25 @@ load_dotenv()
 class OllamaBibleAgentEngine:
     def __init__(self, model: str = "qwen2.5-coder:7b", host: str = "http://localhost:11434"):
         self.host = host.rstrip('/')
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
-        if self.gemini_api_key and self.gemini_api_key.strip() in ["", "sua_chave_aqui"]:
-            self.gemini_api_key = None
+        raw_keys = os.environ.get("GEMINI_API_KEY", "")
+        self.gemini_keys = [k.strip() for k in raw_keys.split(",") if k.strip() and k.strip() not in ["", "sua_chave_aqui"]]
+        self.gemini_api_key = self.gemini_keys[0] if self.gemini_keys else None
+        self._key_index = 0
             
         self.active_engine = os.environ.get("ACTIVE_ENGINE", "gemini").lower()
-        self.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+        self.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
         self.deepseek_model = "deepseek-r1:1.5b"
         
         if self.active_engine == "gemini" and self.gemini_api_key:
-            self.model = f"Google Gemini ⚡ ({self.gemini_model})"
+            num_keys = len(self.gemini_keys)
+            self.model = f"Google Gemini ⚡ ({self.gemini_model}) [{num_keys} chave(s)]"
         elif self.active_engine == "ollama":
             self.model = f"Ollama Local ({self.deepseek_model} / {model})"
         else:
             self.model = "Fallback de Segurança (Nenhum motor válido configurado)"
 
-        self.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
-        self.deepseek_model = "deepseek-r1:1.5b"
-        
-        if self.gemini_api_key:
-            self.model = f"Google Gemini ⚡ ({self.gemini_model}) + DeepSeek-R1"
-        else:
-            self.model = f"Ollama Bicameral (DeepSeek-R1 + {model})"
+    def _get_active_keys(self) -> List[str]:
+        return self.gemini_keys if self.gemini_keys else ([self.gemini_api_key] if self.gemini_api_key else [])
 
     def _chat_via_gemini(self, messages: List[Dict[str, str]], format: Optional[str] = None, timeout: int = 90) -> Dict[str, Any]:
         prompt_text = ""
@@ -65,39 +62,47 @@ class OllamaBibleAgentEngine:
             prompt_text += f"{role}:\n{m.get('content', '')}\n\n"
 
         payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
-        gen_config = {"temperature": 0.8, "maxOutputTokens": 8192}
+        gen_config = {"temperature": 0.85, "maxOutputTokens": 8192}
         if format == "json":
             gen_config["response_mime_type"] = "application/json"
         payload["generationConfig"] = gen_config
 
         candidate_models = [
             self.gemini_model,
-            "gemini-3.6-flash",
-            "gemini-1.5-pro",
             "gemini-flash-latest",
-            "gemini-3.5-flash-lite"
+            "gemini-2.5-flash",
+            "gemini-3.5-flash",
+            "gemini-3.6-flash"
         ]
+        # Remove duplicatas preservando ordem
+        candidate_models = list(dict.fromkeys(candidate_models))
+
+        keys_to_try = self._get_active_keys()
+        if not keys_to_try:
+            raise RuntimeError("Nenhuma chave Gemini disponível.")
 
         last_err = None
-        for target_m in candidate_models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_m}:generateContent?key={self.gemini_api_key}"
-            try:
-                r = requests.post(url, json=payload, timeout=timeout)
-                if r.status_code == 200:
-                    data = r.json()
-                    cand = data.get("candidates", [])
-                    if cand:
-                        parts = cand[0].get("content", {}).get("parts", [])
-                        if parts and "text" in parts[0]:
-                            return {"content": parts[0]["text"], "model_used": target_m}
-                elif r.status_code in [429, 503]:
-                    last_err = f"Status {r.status_code} em {target_m}"
+        for key in keys_to_try:
+            for target_m in candidate_models:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_m}:generateContent?key={key}"
+                try:
+                    r = requests.post(url, json=payload, timeout=timeout)
+                    if r.status_code == 200:
+                        data = r.json()
+                        cand = data.get("candidates", [])
+                        if cand:
+                            parts = cand[0].get("content", {}).get("parts", [])
+                            if parts and "text" in parts[0]:
+                                return {"content": parts[0]["text"], "model_used": target_m}
+                    elif r.status_code in [429, 503]:
+                        last_err = f"Status {r.status_code} (Quota) em {target_m}"
+                        continue
+                    else:
+                        last_err = f"Status {r.status_code}: {r.text[:120]}"
+                        continue
+                except Exception as e:
+                    last_err = str(e)
                     continue
-                else:
-                    last_err = f"Status {r.status_code}: {r.text[:120]}"
-            except Exception as e:
-                last_err = str(e)
-                continue
 
         raise RuntimeError(f"Gemini API error: {last_err}")
 
@@ -211,9 +216,55 @@ Instruções para o seu comentário:
             if len(comment) > 40:
                 return comment
         except Exception as e:
-            print(f"[!] Erro gerando comentário de @{agent['name']}: {e}")
+            print(f"[!] Erro gerando comentário individual de @{agent['name']}: {e}")
 
-        return f"Saudações, irmão @{author_name}! Como @{agent['name']} ({agent['specialty']}), analisei sua exposição sobre '{topic or post_title}'. Com base nos manuscritos e na harmonia das Escrituras, reforço que sua análise aprofunda de forma exemplar este tema essencial para a fé e a exegese."
+        return self._get_agent_specific_comment_fallback(agent, author_name, topic or post_title)
+
+    def _get_agent_specific_comment_fallback(self, agent: Dict[str, Any], author_name: str, topic: str) -> str:
+        aid = agent.get("id", "").lower()
+        if "exegeta" in aid:
+            return (
+                f"Paz e graça, irmão @{author_name}! Sob a ótica da Exegese dos Idiomas Originais, quero somar à sua abordagem sobre **'{topic}'** "
+                f"destacando as raízes semânticas do texto. Ao investigarmos o termo no hebraico e no grego koiné via Léxico de Strong, "
+                f"observamos que a construção gramatical reforça a fidelidade incondicional da Aliança divina. "
+                f"A morfologia dos verbos empregados nos manuscritos mais antigos (como o Papiro 66 e o Códice de Leningrado) "
+                f"confirma que o sentido exegético original aponta para o cumprimento cabal do propósito redentor de Cristo."
+            )
+        elif "historiador" in aid:
+            return (
+                f"Saudações fraternas, colega @{author_name}! Como Historiador e Arqueólogo Bíblico, observo que sua exposição sobre **'{topic}'** "
+                f"ganha ainda mais força quando compreendemos o cenário geopolítico do Antigo Oriente e do Império Romano do Século I. "
+                f"Fontes historiográficas primárias, incluindo os relatos de Flávio Josefo (*Antiguidades Judaicas*, Livro XVIII) e os Manuscritos "
+                f"do Mar Morto (1QS e 4QMMT), documentam com precisão as tensões socioculturais e sacerdotais da época. "
+                f"Seu estudo se alinha com fidelidade ao registro arqueológico e histórico preservado."
+            )
+        elif "sistematico" in aid:
+            return (
+                f"Excelente contribuição, prezado @{author_name}! Analisando sua tese sobre **'{topic}'** sob a Teologia Sistemática e a Tipologia Bíblica, "
+                f"é fundamental sublinhar a continuidade orgânica entre o Antigo e o Novo Testamento. O que na Antiga Dispensação foi "
+                f"estabelecido como sombra e figura tipológica (conforme Hebreus 8:5 e 10:1), em Cristo atinge sua substância e realidade definitiva. "
+                f"A harmonia das alianças (Adâmica, Abraâmica, Mosaica e a Nova Aliança) corrobora integralmente a solidez teológica da sua conclusão."
+            )
+        elif "profetico" in aid:
+            return (
+                f"A paz do Senhor, irmão @{author_name}! Do ponto de vista das Profecias e da Escatologia Bíblica, sua reflexão sobre **'{topic}'** "
+                f"ressoa diretamente com as declarações messiânicas de Isaías 53 e Daniel 9. Vemos aqui o princípio do cumprimento progressivo "
+                f"das promessas escatológicas que culminam no reinado eterno do Cordeiro. A convergência entre o prenúncio dos profetas do Antigo "
+                f"Testamento e a revelação do Apocalipse de João ratifica a urgência e o peso profético desta mensagem para a Igreja de hoje."
+            )
+        elif "devocional" in aid:
+            return (
+                f"Amém, querido irmão @{author_name}! Quero trazer essa profunda pesquisa sobre **'{topic}'** para a aplicação prática na vida cristã diária. "
+                f"Mais do que um debate acadêmico, o coração do Evangelho nos convoca a viver essa verdade no altar do cotidiano. "
+                f"Como pastores e servos, nosso chamado é transformar essa doutrina em oração, consagração e amor ao próximo, "
+                f"permitindo que o Espírito Santo frutifique esse conhecimento em santidade e testemunho genuíno."
+            )
+        else:
+            return (
+                f"Saudações em Cristo, amado @{author_name}! Como {agent.get('role', 'Teólogo')}, debrucei-me sobre sua reflexão acerca de **'{topic}'**. "
+                f"A coerência hermenêutica das Escrituras atesta que a verdade de Deus é auto-autenticável e perfeita em todas as suas partes. "
+                f"Sua exposição preserva a fidelidade ao cânon sagrado e enriquece grandemente a edificação teológica do nosso colegiado."
+            )
 
     def _get_fallback_with_sources(self, agent: Dict[str, Any], topic: str) -> Dict[str, str]:
         return {
@@ -402,6 +453,7 @@ def execute_study_cycle_internal(selected_topic=None):
     commenting_agents = random.sample(available_commenters, num_commenters)
     comments = []
     for c_agent in commenting_agents:
+        time.sleep(2)  # Pausa respeitosa entre chamadas individuais para evitar limite de requisições por minuto
         c_text = ai_engine.generate_theological_comment(c_agent, res["title"], res["content"], author["name"], past_posts, topic=topic)
         comments.append({
             "agent_id": c_agent["id"],
