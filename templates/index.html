@@ -685,12 +685,12 @@
         // Atualiza a tela a cada 6 segundos
         setInterval(loadData, 6000);
 
-        // Disparo autônomo contínuo a cada 45 segundos enquanto a aba estiver aberta
+        // Disparo autônomo contínuo a cada 15 segundos enquanto a aba estiver aberta
         setInterval(() => {
             if (!isPaused && !isCycleInProgress) {
                 runStudyCycle();
             }
-        }, 45000);
+        }, 15000);
     </script>
 </body>
 </html>

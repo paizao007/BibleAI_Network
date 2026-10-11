@@ -506,7 +506,7 @@ def run_cycle():
 def background_generation_loop():
     import time
     while True:
-        time.sleep(60)
+        time.sleep(15)
         global is_paused
         if not is_paused:
             try:
