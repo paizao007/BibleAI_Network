@@ -176,7 +176,7 @@ FORMATO DE SAÍDA EXIGIDO (JSON):
         # Fallback de alta riqueza com fontes explícitas
         return self._get_fallback_with_sources(agent, topic)
 
-    def generate_theological_comment(self, agent: Dict[str, Any], post_title: str, post_content: str, author_name: str, past_posts: List[Dict[str, Any]] = None) -> str:
+    def generate_theological_comment(self, agent: Dict[str, Any], post_title: str, post_content: str, author_name: str, past_posts: List[Dict[str, Any]] = None, topic: str = "") -> str:
         memory_str = ""
         if past_posts:
             agent_comments = []
@@ -190,27 +190,30 @@ FORMATO DE SAÍDA EXIGIDO (JSON):
                     memory_str += f"- Você argumentou: {ac[:200]}...\n"
 
         system_prompt = f"""Você é o teólogo @{agent['name']} ({agent['role']}).
-Seu colega @{author_name} publicou o estudo:
+Seu colega @{author_name} publicou um estudo sobre a pauta: "{topic or post_title}".
 Título: "{post_title}"
-Conteúdo: "{post_content[:700]}..."
+Trecho do Conteúdo: "{post_content[:700]}..."
 {memory_str}
 
-Escreva um COMENTÁRIO E DEBATE TEOLÓGICO DE APROFUNDAMENTO (3 parágrafos) DECLARANDO SUAS FONTES.
-Cite os livros bíblicos, numerações Strong ou documentos históricos (ex: Filo de Alexandria, Josefo, Septuaginta LXX) que sustentam sua afirmação.
+Instruções para o seu comentário:
+1. Dirija-se diretamente a @{author_name} com saudação fraterna e debata a tese dele sobre esta pauta específica ("{topic or post_title}").
+2. Traga a perspectiva da sua especialidade ({agent['specialty']}).
+3. Declare explicitamente suas fontes bibliográficas primárias (livros bíblicos com capítulo e versículo, termos no hebraico/grego com numerações Strong e documentos históricos como Josefo, Filo, Septuaginta LXX ou Pais da Igreja).
+4. Redija um debate erudito de 2 a 3 parágrafos densos e construtivos.
 """
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": "Escreva seu comentário fundamentado com fontes."}
+            {"role": "user", "content": f"Escreva seu comentário fundamentado debatendo a pauta '{topic or post_title}' com @{author_name}."}
         ]
         try:
             res = self.chat(messages)
             comment = res["content"].strip()
             if len(comment) > 40:
                 return comment
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[!] Erro gerando comentário de @{agent['name']}: {e}")
 
-        return f"Como @{agent['name']} ({agent['specialty']}), fundamentando no texto de Hebreus 9:11-12 e no Léxico Strong (G2665 - Katapetasma), reforço que o estudo de @{author_name} demonstra com precisão a conclusão da Antiga Aliança."
+        return f"Saudações, irmão @{author_name}! Como @{agent['name']} ({agent['specialty']}), analisei sua exposição sobre '{topic or post_title}'. Com base nos manuscritos e na harmonia das Escrituras, reforço que sua análise aprofunda de forma exemplar este tema essencial para a fé e a exegese."
 
     def _get_fallback_with_sources(self, agent: Dict[str, Any], topic: str) -> Dict[str, str]:
         return {
@@ -363,21 +366,42 @@ def execute_study_cycle_internal(selected_topic=None):
     if not agents or not topics:
         return {"error": "Nenhum agente ou pauta configurada"}
         
-    author = random.choice(agents)
-    topic = selected_topic if selected_topic and selected_topic in topics else random.choice(topics)
+    past_posts = db.get("posts", [])
     
+    # 1. Garante que se o usuário escolheu uma pauta específica, ela seja respeitada
+    if selected_topic and str(selected_topic).strip():
+        topic = str(selected_topic).strip()
+        if topic not in topics:
+            topics.insert(0, topic)
+            db["topics"] = topics
+            save_db(db)
+    else:
+        # 2. Priorização Inteligente de Pautas:
+        # Identifica quais pautas cadastradas ainda NÃO foram debatidas pela equipe
+        debated_topics = {p.get("topic") for p in past_posts if p.get("topic")}
+        undebated = [t for t in topics if t not in debated_topics]
+        
+        if undebated:
+            # Pega sempre a pauta nova pendente para garantir interação imediata
+            topic = undebated[0]
+        else:
+            # Se todas já foram debatidas, escolhe a menos debatida ou aleatória
+            topic = random.choice(topics)
+            
     print(f"[📚 CITATION ENGINE] Gerando ESTUDO COM FONTES EXPLÍCITAS por @{author['name']} sobre '{topic}'...")
     
-    past_posts = db.get("posts", [])
     res = ai_engine.generate_theological_post(author, topic, past_posts)
     
     timestamp = get_brazil_time_str()
     post_id = f"study_{int(time.time())}"
     
-    commenting_agents = random.sample([a for a in agents if a["id"] != author["id"]], 2)
+    # Seleciona de 2 a 3 colegas para debaterem ativamente a pauta
+    available_commenters = [a for a in agents if a["id"] != author["id"]]
+    num_commenters = min(len(available_commenters), 3)
+    commenting_agents = random.sample(available_commenters, num_commenters)
     comments = []
     for c_agent in commenting_agents:
-        c_text = ai_engine.generate_theological_comment(c_agent, res["title"], res["content"], author["name"], past_posts)
+        c_text = ai_engine.generate_theological_comment(c_agent, res["title"], res["content"], author["name"], past_posts, topic=topic)
         comments.append({
             "agent_id": c_agent["id"],
             "agent_name": c_agent["name"],
