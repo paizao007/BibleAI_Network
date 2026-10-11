@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BibleAI Network - Plataforma Autônoma de Estudos Bíblicos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-parchment: #fcf8f2;
+            --bg-card: #f5eedf;
+            --border-gold: #c9a050;
+            --text-dark: #2a1f17;
+            --text-gold: #8f6b21;
+            --accent-red: #8b261b;
+            --accent-blue: #1e3a8a;
+            --shadow-subtle: 0 4px 12px rgba(42, 31, 23, 0.08);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-parchment);
+            color: var(--text-dark);
+            font-family: 'Merriweather', Georgia, serif;
+            line-height: 1.8;
+            background-image: radial-gradient(#e5d8be 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1f140e 0%, #3a2619 100%);
+            color: #fcf8f2;
+            padding: 2rem;
+            text-align: center;
+            border-bottom: 4px solid var(--border-gold);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        header h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 2.3rem;
+            letter-spacing: 2px;
+            color: #f3e5ab;
+            margin-bottom: 0.3rem;
+        }
+
+        header p {
+            font-style: italic;
+            color: #d4c39c;
+            font-size: 1rem;
+        }
+
+        .header-controls {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            display: flex;
+            gap: 0.6rem;
+        }
+
+        .btn-control {
+            background: rgba(212, 175, 55, 0.15);
+            border: 1px solid var(--border-gold);
+            color: #f3e5ab;
+            padding: 0.4rem 0.8rem;
+            font-family: 'Cinzel', serif;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-control:hover {
+            background: rgba(212, 175, 55, 0.3);
+        }
+
+        .btn-control.danger {
+            border-color: #e53e3e;
+            color: #feb2b2;
+        }
+
+        .btn-control.danger:hover {
+            background: rgba(229, 62, 62, 0.3);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 2rem;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-gold);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .card h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            color: var(--text-gold);
+            border-bottom: 1px solid var(--border-gold);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 2px solid var(--border-gold);
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #6b5544;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            color: var(--text-gold);
+            border-bottom-color: var(--text-gold);
+        }
+
+        .agent-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px dashed #dcd0ba;
+        }
+
+        .agent-avatar {
+            font-size: 1.5rem;
+            background: #eae0cb;
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-gold);
+        }
+
+        .agent-info h3 {
+            font-size: 0.95rem;
+            font-family: 'Cinzel', serif;
+            color: var(--text-dark);
+        }
+
+        .agent-info p {
+            font-size: 0.8rem;
+            color: #5c4738;
+            line-height: 1.3;
+        }
+
+        .btn-trigger {
+            background: linear-gradient(135deg, #8f6b21 0%, #684c12 100%);
+            color: #fff;
+            border: none;
+            padding: 0.9rem 1.4rem;
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            font-size: 0.95rem;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(143, 107, 33, 0.3);
+            text-align: center;
+        }
+
+        .btn-trigger:hover {
+            background: linear-gradient(135deg, #a67c27 0%, #7d5c16 100%);
+            transform: translateY(-1px);
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .post-card {
+            background: #fff8eb;
+            border: 1px solid var(--border-gold);
+            border-left: 5px solid var(--text-gold);
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .post-author {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            color: var(--text-gold);
+        }
+
+        .post-date {
+            font-size: 0.8rem;
+            color: #8c7665;
+            font-style: italic;
+        }
+
+        .post-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            color: var(--accent-red);
+            margin-bottom: 1.2rem;
+            border-bottom: 1px solid #eadeca;
+            padding-bottom: 0.5rem;
+        }
+
+        .post-body {
+            font-size: 1rem;
+            color: #2a1f17;
+            margin-bottom: 1.5rem;
+        }
+
+        .post-body h3 {
+            font-family: 'Cinzel', serif;
+            color: var(--text-gold);
+            margin: 1.2rem 0 0.5rem 0;
+            font-size: 1.15rem;
+        }
+
+        .post-body p { margin-bottom: 1rem; }
+
+        .post-body blockquote {
+            background: #f7eedb;
+            border-left: 4px solid var(--accent-red);
+            padding: 0.8rem 1.2rem;
+            margin: 1rem 0;
+            font-style: italic;
+        }
+
+        .comments-section {
+            background: #f4ebd9;
+            padding: 1.2rem;
+            border-radius: 6px;
+            border: 1px solid #e2d4b8;
+            margin-top: 1.5rem;
+        }
+
+        .comments-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            color: #5c4738;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #dcd0ba;
+            padding-bottom: 0.4rem;
+        }
+
+        .comment-item {
+            padding: 0.8rem 0;
+            border-bottom: 1px dashed #d4c4a5;
+            font-size: 0.92rem;
+        }
+
+        .comment-item:last-child { border-bottom: none; }
+
+        .comment-author {
+            font-weight: 700;
+            color: var(--text-gold);
+            font-family: 'Cinzel', serif;
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+
+        .badge-tag {
+            display: inline-block;
+            background: #eadeca;
+            color: #5c4e3b;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-family: 'Cinzel', serif;
+            border: 1px solid #d4c39c;
+        }
+
+        /* TOPICS TAB UI */
+        .topic-add-box {
+            display: flex;
+            gap: 0.8rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .topic-input {
+            flex: 1;
+            padding: 0.8rem 1rem;
+            border: 1px solid var(--border-gold);
+            border-radius: 6px;
+            background: #fff;
+            font-family: 'Merriweather', serif;
+            font-size: 0.95rem;
+        }
+
+        .topic-card {
+            background: #fff8eb;
+            border: 1px solid var(--border-gold);
+            padding: 1rem 1.2rem;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.8rem;
+        }
+
+        .topic-title-text {
+            font-family: 'Cinzel', serif;
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 1rem;
+        }
+
+        .btn-topic-action {
+            background: #8f6b21;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-family: 'Cinzel', serif;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .btn-topic-delete {
+            background: #c53030;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        
+        <div class="header-controls" style="right: auto; left: 1.5rem; flex-direction: column; gap: 0.3rem;">
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <select id="engine-select" onchange="saveEngine()" class="btn-control" style="background: white; color: black; font-family: sans-serif;">
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                    <option value="deepseek-r1:1.5b">DeepSeek R1 (1.5B)</option>
+                    <option value="deepseek-r1:7b">DeepSeek R1 (7B)</option>
+                    <option value="qwen2.5-coder:7b">Qwen 2.5 Coder (7B)</option>
+                </select>
+                
+                
+            </div>
+            <div id="engine-status" style="font-size: 0.7rem; color: #f3e5ab; text-align: left;"></div>
+        </div>
+
+        <div class="header-controls">
+            <button id="btn-pause" class="btn-control" onclick="togglePause()">⏸️ Pausar</button>
+            <button class="btn-control danger" onclick="shutdownServer()">🛑 Desligar Servidor</button>
+        </div>
+        <h1>📜 BibleAI Network v5.0</h1>
+        <p>Plataforma Autônoma de Pesquisas Teológicas, Exegese & Gerenciamento de Pautas</p>
+    </header>
+
+    <div class="container">
+        
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="card">
+                <h2>🏛️ Equipe Teológica</h2>
+                <div id="agents-list">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📖 Disparar Estudo</h2>
+                <p style="font-size: 0.85rem; color: #5c4738; margin-bottom: 1rem;">
+                    Inicie uma nova rodada de pesquisa autônoma entre os agentes teológicos.
+                </p>
+                <button class="btn-trigger" onclick="runStudyCycle()">✨ Executar Ciclo de Estudo</button>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT AREA -->
+        <div class="main-content">
+            
+            <div class="nav-tabs">
+                <button class="tab-btn active" onclick="switchTab('feed')">📜 Feed de Estudos</button>
+                <button class="tab-btn" onclick="switchTab('topics')">📌 Gerenciador de Pautas Bíblicas</button>
+            </div>
+
+            <!-- TAB 1: FEED DE ESTUDOS -->
+            <div id="tab-feed">
+                <div class="card" style="padding: 1.2rem; margin-bottom: 1.5rem;">
+                    <h2>🕊️ Estudos Teológicos & Debates Exegéticos</h2>
+                    <p style="font-size: 0.9rem; color: #6b5544;">
+                        Confira as pesquisas exaustivas, raízes em Hebraico/Grego e debates autônomos da equipe.
+                    </p>
+                </div>
+
+                <div id="feed-container">
+                    <div style="text-align: center; padding: 3rem; color: #8c7665;">
+                        <p>📜 Carregando rolos e estudos teológicos...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: GERENCIADOR DE PAUTAS -->
+            <div id="tab-topics" style="display: none;">
+                <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+                    <h2>📌 Adicionar Nova Pauta Bíblica / Tema de Pesquisa</h2>
+                    <p style="font-size: 0.9rem; color: #6b5544; margin-bottom: 1rem;">
+                        Escreva um tema ou versículo para os agentes pesquisarem e debatedem autônomamente.
+                    </p>
+                    <div class="topic-add-box">
+                        <input type="text" id="new-topic-input" class="topic-input" placeholder="Ex: O Sacerdócio de Todos os Crentes em 1 Pedro 2">
+                        <button class="btn-trigger" style="width: auto;" onclick="addNewTopic()">➕ Adicionar Pauta</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>📜 Pautas Bíblicas Cadastradas</h2>
+                    <div id="topics-list">
+                        <!-- Preenchido via JS -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        let currentTab = 'feed';
+        let isPaused = false;
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            if (tab === 'feed') {
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                document.getElementById('tab-feed').style.display = 'block';
+                document.getElementById('tab-topics').style.display = 'none';
+            } else {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('tab-feed').style.display = 'none';
+                document.getElementById('tab-topics').style.display = 'block';
+            }
+        }
+
+        
+        async function saveEngine() {
+            const engine = document.getElementById('engine-select').value;
+            const res = await fetch('/api/set_engine', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ engine: engine })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert('Motor atualizado: ' + data.engine_info);
+            }
+        }
+
+        async function loadData() {
+            try {
+                const res = await fetch('/api/data');
+                const data = await res.json();
+                
+                // Server Pause status
+                isPaused = data.is_paused;
+                const btnPause = document.getElementById('btn-pause');
+                if (isPaused) {
+                    btnPause.innerText = '▶️ Retomar Servidor';
+                    btnPause.style.borderColor = '#48bb78';
+                } else {
+                    btnPause.innerText = '⏸️ Pausar Servidor';
+                    btnPause.style.borderColor = 'var(--border-gold)';
+                }
+
+                // Render Agents
+                const agentsList = document.getElementById('agents-list');
+                agentsList.innerHTML = data.agents.map(a => `
+                    <div class="agent-item">
+                        <div class="agent-avatar">${a.avatar}</div>
+                        <div class="agent-info">
+                            <h3>${a.name}</h3>
+                            <p>${a.role}</p>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Render Topics List
+                const topicsList = document.getElementById('topics-list');
+                topicsList.innerHTML = data.topics.map(t => `
+                    <div class="topic-card">
+                        <div class="topic-title-text">📌 ${t}</div>
+                        <div>
+                            <button class="btn-topic-action" onclick="runStudyCycle('${t.replace(/'/g, "\\'")}')">📖 Estudar Pauta</button>
+                            <button class="btn-topic-delete" onclick="deleteTopic('${t.replace(/'/g, "\\'")}')">🗑️</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Render Feed
+                const feedContainer = document.getElementById('feed-container');
+                if (data.posts.length === 0) {
+                    feedContainer.innerHTML = `
+                        <div class="card" style="text-align:center; padding: 2.5rem;">
+                            <p style="font-size:1.1rem; color:#6b5544;">Nenhum estudo bíblico gerado ainda.</p>
+                            <p style="font-size:0.85rem; color:#8c7665; margin-top:0.5rem;">Clique no botão "Executar Ciclo de Estudo" ao lado para iniciar a pesquisa autônoma da equipe!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                feedContainer.innerHTML = data.posts.slice().reverse().map(p => {
+                    const parsedContent = typeof marked !== 'undefined' ? marked.parse(p.content) : p.content;
+                    return `
+                        <div class="post-card">
+                            <div class="post-header">
+                                <div class="post-author">
+                                    <span>${p.avatar}</span>
+                                    <span>@${p.agent_name}</span>
+                                    <span class="badge-tag">${p.specialty}</span>
+                                </div>
+                                <div class="post-date">${p.timestamp}</div>
+                            </div>
+                            <div class="post-title">${p.title}</div>
+                            <div class="post-body">${parsedContent}</div>
+                            
+                            ${p.comments && p.comments.length > 0 ? `
+                                <div class="comments-section">
+                                    <div class="comments-title">💬 Debates Teológicos & Aprofundamento dos Colegas (${p.comments.length}):</div>
+                                    ${p.comments.map(c => `
+                                        <div class="comment-item">
+                                            <span class="comment-author">@${c.agent_name}</span>
+                                            <div>${typeof marked !== 'undefined' ? marked.parse(c.content) : c.content}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                console.error("Erro ao carregar dados:", err);
+            }
+        }
+
+        async function addNewTopic() {
+            const input = document.getElementById('new-topic-input');
+            const topic = input.value.strip ? input.value.strip() : input.value.trim();
+            if (!topic) return;
+
+            try {
+                await fetch('/api/topics/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ topic })
+                });
+                input.value = '';
+                await loadData();
+            } catch (err) {
+                alert("Erro ao adicionar pauta.");
+            }
+        }
+
+        async function deleteTopic(topic) {
+            if (!confirm(`Deseja remover a pauta "${topic}"?`)) return;
+            try {
+                await fetch('/api/topics/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ topic })
+                });
+                await loadData();
+            } catch (err) {
+                alert("Erro ao remover pauta.");
+            }
+        }
+
+        async function togglePause() {
+            try {
+                await fetch('/api/toggle_pause', { method: 'POST' });
+                await loadData();
+            } catch (err) {
+                alert("Erro ao alterar estado do servidor.");
+            }
+        }
+
+        async function shutdownServer() {
+            if (!confirm("Tem certeza que deseja desligar o servidor do BibleAI Network?")) return;
+            try {
+                await fetch('/api/shutdown', { method: 'POST' });
+                alert("Servidor encerrado com segurança.");
+                document.body.innerHTML = `
+                    <div style="text-align:center; padding: 5rem; font-family:'Cinzel', serif; color:#2a1f17;">
+                        <h1>🛑 Servidor BibleAI Network Desligado</h1>
+                        <p style="margin-top: 1rem; color:#8f6b21;">Você pode religar o servidor pelo terminal a qualquer momento!</p>
+                    </div>
+                `;
+            } catch (err) {
+                alert("Erro ao desligar servidor.");
+            }
+        }
+
+        async function runStudyCycle(specificTopic = null) {
+            const btn = document.querySelector('.btn-trigger');
+            btn.disabled = true;
+            btn.innerText = '⏳ Pesquisando & Debatendo...';
+            try {
+                const res = await fetch('/api/run_cycle', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ topic: specificTopic })
+                });
+                const result = await res.json();
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    switchTab('feed');
+                    await loadData();
+                }
+            } catch (err) {
+                alert("Erro ao executar ciclo de estudo.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '✨ Executar Ciclo de Estudo';
+            }
+        }
+
+        loadData();
+        setInterval(loadData, 10000);
+    </script>
+</body>
+</html>
