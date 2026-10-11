@@ -560,10 +560,18 @@
                                 <div class="post-date">${p.timestamp}</div>
                             </div>
                             <div class="post-title">${p.title}</div>
+                            
+                            <div style="display: flex; gap: 0.8rem; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap;">
+                                <button onclick="document.getElementById('comments-${p.id}') ? document.getElementById('comments-${p.id}').scrollIntoView({behavior: 'smooth'}) : null" 
+                                        style="background: linear-gradient(135deg, #2a1f17 0%, #4a3423 100%); color: #f3e5ab; border: 1px solid var(--border-gold); padding: 0.4rem 0.9rem; border-radius: 4px; font-family: 'Cinzel', serif; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                                    💬 Ver Debate dos Colegas Teólogos (${p.comments ? p.comments.length : 0} respostas) ⬇️
+                                </button>
+                            </div>
+
                             <div class="post-body">${parsedContent}</div>
                             
                             ${p.comments && p.comments.length > 0 ? `
-                                <div class="comments-section">
+                                <div class="comments-section" id="comments-${p.id}">
                                     <div class="comments-title">💬 Debates Teológicos & Aprofundamento dos Colegas (${p.comments.length}):</div>
                                     ${p.comments.map(c => `
                                         <div class="comment-item">
