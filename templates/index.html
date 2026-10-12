@@ -1431,9 +1431,9 @@
                     <div class="hero-badge">🕊️ CÁTEDRA DE EXEGESE & PESQUISAS TEOLÓGICAS AUTÔNOMAS</div>
                     <div class="hero-topic-box">
                         <span class="hero-topic-label">📌 PAUTA CENTRAL EM FOCO:</span>
-                        <h1 class="hero-topic-title" id="hero-active-topic">Ezequiel 25:17</h1>
+                        <h1 class="hero-topic-title" id="hero-active-topic">fim dos tempos</h1>
                         <div class="hero-verse-quote" id="hero-active-verse">
-                            "E executarei neles grandes vinganças, com furiosos castigos; e saberão que eu sou o SENHOR, quando eu tiver exercido a minha vingança sobre eles." (Ezequiel 25:17)
+                            "E este evangelho do reino será pregado em todo o mundo, em testemunho a todas as gentes, e então virá o fim... E eis que cedo venho, e o meu galardão está comigo, para dar a cada um segundo a sua obra." (Mateus 24:14, 29-31 / Apocalipse 22:12-13)
                         </div>
                     </div>
                     <div class="hero-stats-bar">
@@ -1781,8 +1781,12 @@
 
         function renderQuickTopics(topics) {
             const quickList = document.getElementById('quick-topics-list');
-            if (!quickList || !topics) return;
-            quickList.innerHTML = topics.slice(0, 5).map(t => `
+            if (!quickList) return;
+            if (!topics || topics.length === 0) {
+                quickList.innerHTML = '<div style="color: #8c7665; font-style: italic; font-size: 0.95rem; padding: 0.5rem 0;">Nenhuma outra pauta cadastrada. Lance uma nova pauta no Gerenciador.</div>';
+                return;
+            }
+            quickList.innerHTML = topics.map(t => `
                 <div style="padding: 0.85rem 0.95rem; background: #fffdfa; border: 1px solid #e2d4b8; border-radius: 7px; margin-bottom: 0.7rem; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
                     <div style="font-family: 'EB Garamond', Georgia, serif; font-size: 1.12rem; font-weight: 700; color: #3b2414; line-height: 1.35; margin-bottom: 0.5rem; word-break: break-word;">
                         📌 ${t}
@@ -2042,7 +2046,7 @@
                 }
 
                 // Active Topic & Hero Stats
-                const activeTopic = (data.topics && data.topics.length > 0) ? data.topics[0] : 'Ezequiel 25:17';
+                const activeTopic = (data.topics && data.topics.length > 0) ? data.topics[0] : (data.posts && data.posts.length > 0 ? data.posts[data.posts.length - 1].topic : 'fim dos tempos');
                 const heroTopicEl = document.getElementById('hero-active-topic');
                 if (heroTopicEl && heroTopicEl.innerText !== activeTopic) heroTopicEl.innerText = activeTopic;
 
@@ -2072,16 +2076,20 @@
 
                 // Render Topics Tab
                 const topicsList = document.getElementById('topics-list');
-                if (topicsList && data.topics && currentTab === 'topics') {
-                    topicsList.innerHTML = data.topics.map(t => `
-                        <div class="topic-card">
-                            <div class="topic-title-text">📌 ${t}</div>
-                            <div>
-                                <button class="btn-topic-action" onclick="runStudyCycle('${t.replace(/'/g, "\\'")}')">📖 Estudar Pauta</button>
-                                <button class="btn-topic-delete" onclick="deleteTopic('${t.replace(/'/g, "\\'")}')">🗑️</button>
+                if (topicsList && currentTab === 'topics') {
+                    if (!data.topics || data.topics.length === 0) {
+                        topicsList.innerHTML = '<div style="color: #8c7665; font-style: italic; padding: 1.2rem; text-align: center;">Nenhuma pauta cadastrada. Digite uma pauta no campo acima para fixá-la como pauta central de estudo.</div>';
+                    } else {
+                        topicsList.innerHTML = data.topics.map(t => `
+                            <div class="topic-card">
+                                <div class="topic-title-text">📌 ${t}</div>
+                                <div>
+                                    <button class="btn-topic-action" onclick="runStudyCycle('${t.replace(/'/g, "\\'")}')">📖 Estudar Pauta</button>
+                                    <button class="btn-topic-delete" onclick="deleteTopic('${t.replace(/'/g, "\\'")}')">🗑️</button>
+                                </div>
                             </div>
-                        </div>
-                    `).join('');
+                        `).join('');
+                    }
                 }
 
                 const newSignature = getFeedSignature(data, selectedAgentFilter);
@@ -2134,13 +2142,16 @@
             if (!topic) return;
 
             try {
-                await fetch('/api/topics/add', {
+                const res = await fetch('/api/topics/add', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ topic })
                 });
+                const data = await res.json();
                 input.value = '';
+                switchTab('feed');
                 await loadData(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (err) {
                 alert("Erro ao adicionar pauta.");
             }

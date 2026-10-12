@@ -342,7 +342,15 @@ def get_data():
     db["is_paused"] = db.get("is_paused", False)
     db["engine_info"] = ai_engine.model
     topics = db.get("topics", [])
-    active_topic = topics[0] if topics else "O Amor Redentor em João 3:16"
+    if not topics:
+        last_post_topic = db.get("posts", [])[-1].get("topic") if db.get("posts") else "fim dos tempos"
+        active_topic = last_post_topic or "fim dos tempos"
+        topics = [active_topic]
+        db["topics"] = topics
+        save_db(db)
+    else:
+        active_topic = topics[0]
+
     ctx = identify_theological_context(active_topic)
     db["active_verse_text"] = ctx.get("verse_text", "")
     db["active_verse_ref"] = ctx.get("verse_ref", "")
@@ -357,11 +365,12 @@ def add_topic():
         
     db = load_db()
     topics = db.setdefault("topics", [])
-    if new_topic not in topics:
-        topics.insert(0, new_topic)
-        save_db(db)
-        return jsonify({"success": True, "topics": topics})
-    return jsonify({"success": True, "message": "Pauta já existe", "topics": topics})
+    if new_topic in topics:
+        topics.remove(new_topic)
+    # Insere no topo para ser fixada como pauta central ativa
+    topics.insert(0, new_topic)
+    save_db(db)
+    return jsonify({"success": True, "topics": topics, "active_topic": new_topic})
 
 @app.route('/api/topics/delete', methods=['POST'])
 def delete_topic():
@@ -435,12 +444,12 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
         agents = db.get("agents", [])
         topics = db.get("topics", [])
         
-        if not agents or not topics:
-            return {"error": "Nenhum agente ou pauta configurada"}
+        if not agents:
+            return {"error": "Nenhum agente configurado"}
             
         past_posts = db.get("posts", [])
         
-        # 1. Garante que se o usuário escolheu uma pauta específica, ela seja respeitada
+        # 1. Garante que se o usuário escolheu uma pauta específica, ela seja respeitada e fixada no topo
         if selected_topic and str(selected_topic).strip():
             topic = str(selected_topic).strip()
             if topic in topics:
@@ -448,9 +457,15 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
             topics.insert(0, topic)
             db["topics"] = topics
             save_db(db)
+        elif topics:
+            topic = topics[0]
         else:
-            # Pauta Central em Foco: sempre honra a pauta ativa definida pelo usuário (topics[0])
-            topic = topics[0] if topics else "Ezequiel 25:17"
+            # Se não houver pauta cadastrada, recupera do último estudo gerado
+            last_post_topic = past_posts[-1].get("topic") if past_posts else "fim dos tempos"
+            topic = last_post_topic or "fim dos tempos"
+            topics = [topic]
+            db["topics"] = topics
+            save_db(db)
 
         # Seleção de autor: rotaciona ativamente entre os 7 eruditos para que cada um traga a visão de sua cátedra
         if selected_agent_id:
