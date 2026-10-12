@@ -61,12 +61,14 @@
             width: 100%;
             max-width: 100%;
             overflow-x: hidden;
+            overflow-anchor: auto;
         }
 
         body {
             width: 100%;
             max-width: 100%;
             overflow-x: hidden;
+            overflow-anchor: auto;
             background-color: var(--bg-parchment);
             color: var(--text-dark);
             font-family: 'Lora', 'EB Garamond', Georgia, serif;
@@ -1274,6 +1276,65 @@
                 padding: 0.8rem;
             }
         }
+
+        #feed-container {
+            overflow-anchor: auto;
+        }
+
+        /* NOTIFICAÇÃO FLUTUANTE DE NOVOS TRATADOS (PREVINE PULO E DESLOCAMENTO DE LEITURA) */
+        .new-posts-toast {
+            position: fixed;
+            top: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #8b261b 0%, #5a140d 100%);
+            color: #ffffff !important;
+            border: 2px solid #e5c46b;
+            padding: 0.75rem 1.4rem;
+            border-radius: 30px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(139, 38, 27, 0.35);
+            z-index: 99999;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.65rem;
+            font-family: 'EB Garamond', Georgia, serif;
+            font-size: 1.15rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            animation: toastSlideDown 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            letter-spacing: 0.3px;
+        }
+
+        .new-posts-toast:hover {
+            background: linear-gradient(135deg, #a63022 0%, #701a11 100%);
+            transform: translateX(-50%) translateY(-2px);
+            box-shadow: 0 12px 30px rgba(139, 38, 27, 0.55);
+            border-color: #ffd700;
+        }
+
+        @keyframes toastSlideDown {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-25px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .new-posts-toast {
+                top: 14px;
+                width: 92%;
+                max-width: 360px;
+                font-size: 1.02rem;
+                padding: 0.65rem 1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1567,6 +1628,54 @@
         let currentDbData = null;
         let isCycleInProgress = false;
         let visiblePostsCount = 10; // Limite de 10 posts iniciais para não sobrecarregar o navegador
+        let lastRenderedFeedSig = null;
+        let previousPostsCount = 0;
+        let pendingNewData = null;
+
+        function getFeedSignature(data, filter) {
+            if (!data || !data.posts) return '';
+            const posts = filter ? data.posts.filter(p => (p.agent_id && p.agent_id.toLowerCase() === filter.toLowerCase()) || (p.agent_name && p.agent_name.toLowerCase() === filter.toLowerCase())) : data.posts;
+            return posts.map(p => p.id + ':' + (p.comments ? p.comments.length : 0)).join('|') + `_v:${visiblePostsCount}`;
+        }
+
+        function showNewPostsToast(count) {
+            let toast = document.getElementById('new-posts-toast');
+            const text = count === 1 
+                ? '✨ 📜 1 novo tratado disponível! (Toque para ler no topo) ⬆️' 
+                : `✨ 📜 ${count} novos tratados disponíveis! (Toque para ler no topo) ⬆️`;
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'new-posts-toast';
+                toast.className = 'new-posts-toast';
+                toast.onclick = applyPendingNewPosts;
+                document.body.appendChild(toast);
+            }
+            toast.innerHTML = text;
+        }
+
+        function dismissNewPostsToast() {
+            const toast = document.getElementById('new-posts-toast');
+            if (toast) toast.remove();
+        }
+
+        function applyPendingNewPosts() {
+            dismissNewPostsToast();
+            if (pendingNewData) {
+                currentDbData = pendingNewData;
+                pendingNewData = null;
+                lastRenderedFeedSig = getFeedSignature(currentDbData, selectedAgentFilter);
+                previousPostsCount = (currentDbData.posts || []).length;
+                renderFeed();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Se o leitor rolar até o topo por conta própria, sincroniza sem movimentos bruscos
+        window.addEventListener('scroll', () => {
+            if (window.scrollY < 120 && pendingNewData) {
+                applyPendingNewPosts();
+            }
+        }, { passive: true });
 
         function switchTab(tab) {
             currentTab = tab;
@@ -1599,6 +1708,7 @@
             const activeCard = document.getElementById('agent-card-' + agentId);
             if (activeCard) activeCard.classList.add('active-filter');
             switchTab('feed');
+            lastRenderedFeedSig = null; // Força re-render para o filtro
             renderFeed();
         }
 
@@ -1608,6 +1718,7 @@
             const banner = document.getElementById('filter-banner');
             if (banner) banner.style.display = 'none';
             document.querySelectorAll('.agent-card').forEach(c => c.classList.remove('active-filter'));
+            lastRenderedFeedSig = null; // Força re-render para todos
             renderFeed();
         }
 
@@ -1854,6 +1965,7 @@
 
         function loadMorePosts() {
             visiblePostsCount += 10;
+            lastRenderedFeedSig = null;
             renderFeed();
         }
 
@@ -1870,11 +1982,10 @@
             }
         }
 
-        async function loadData() {
+        async function loadData(forceRender = false) {
             try {
                 const res = await fetch('/api/data');
                 const data = await res.json();
-                currentDbData = data;
                 
                 // Server Pause status
                 isPaused = data.is_paused;
@@ -1898,14 +2009,18 @@
                 // Active Topic & Hero Stats
                 const activeTopic = (data.topics && data.topics.length > 0) ? data.topics[0] : 'Ezequiel 25:17';
                 const heroTopicEl = document.getElementById('hero-active-topic');
-                if (heroTopicEl) heroTopicEl.innerText = activeTopic;
+                if (heroTopicEl && heroTopicEl.innerText !== activeTopic) heroTopicEl.innerText = activeTopic;
 
                 const heroVerseEl = document.getElementById('hero-active-verse');
                 if (heroVerseEl) {
+                    let expectedQuote = '';
                     if (data.active_verse_text && data.active_verse_ref) {
-                        heroVerseEl.innerText = `"${data.active_verse_text}" (${data.active_verse_ref})`;
+                        expectedQuote = `"${data.active_verse_text}" (${data.active_verse_ref})`;
                     } else if (data.active_verse_text) {
-                        heroVerseEl.innerText = `"${data.active_verse_text}"`;
+                        expectedQuote = `"${data.active_verse_text}"`;
+                    }
+                    if (expectedQuote && heroVerseEl.innerText !== expectedQuote) {
+                        heroVerseEl.innerText = expectedQuote;
                     }
                 }
 
@@ -1916,13 +2031,13 @@
                 const statDebates = document.getElementById('stat-debates-count');
                 if (statDebates) statDebates.innerText = totalDebates;
 
-                // Render Components
+                // Render Agents & Quick Topics
                 renderAgents(data.agents, data.posts);
                 renderQuickTopics(data.topics);
 
                 // Render Topics Tab
                 const topicsList = document.getElementById('topics-list');
-                if (topicsList && data.topics) {
+                if (topicsList && data.topics && currentTab === 'topics') {
                     topicsList.innerHTML = data.topics.map(t => `
                         <div class="topic-card">
                             <div class="topic-title-text">📌 ${t}</div>
@@ -1934,8 +2049,44 @@
                     `).join('');
                 }
 
-                // Render Feed
-                renderFeed();
+                const newSignature = getFeedSignature(data, selectedAgentFilter);
+                const currentPostsCount = (data.posts || []).length;
+
+                // Se nada mudou na estrutura dos posts, NUNCA destrói o DOM do feed!
+                if (newSignature === lastRenderedFeedSig && !forceRender) {
+                    currentDbData = data;
+                    return;
+                }
+
+                // Carga inicial ou forçada pelo usuário
+                if (lastRenderedFeedSig === null || forceRender) {
+                    dismissNewPostsToast();
+                    pendingNewData = null;
+                    currentDbData = data;
+                    lastRenderedFeedSig = newSignature;
+                    previousPostsCount = currentPostsCount;
+                    renderFeed();
+                    return;
+                }
+
+                // Chegaram novos posts enquanto a página já estava aberta:
+                const hasNewPosts = currentPostsCount > previousPostsCount;
+                const isUserReading = window.scrollY > 220;
+
+                if (hasNewPosts && isUserReading) {
+                    // O leitor está concentrado lendo: PROTEÇÃO TOTAL CONTRA DESLOCAMENTO
+                    pendingNewData = data;
+                    const diff = currentPostsCount - previousPostsCount;
+                    showNewPostsToast(diff);
+                } else {
+                    // Leitor está no topo: aplica suavemente sem sustos
+                    dismissNewPostsToast();
+                    pendingNewData = null;
+                    currentDbData = data;
+                    lastRenderedFeedSig = newSignature;
+                    previousPostsCount = currentPostsCount;
+                    renderFeed();
+                }
 
             } catch (err) {
                 console.error("Erro ao carregar dados:", err);
@@ -1954,7 +2105,7 @@
                     body: JSON.stringify({ topic })
                 });
                 input.value = '';
-                await loadData();
+                await loadData(true);
             } catch (err) {
                 alert("Erro ao adicionar pauta.");
             }
@@ -1968,7 +2119,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ topic })
                 });
-                await loadData();
+                await loadData(true);
             } catch (err) {
                 alert("Erro ao remover pauta.");
             }
@@ -1977,7 +2128,7 @@
         async function togglePause() {
             try {
                 await fetch('/api/toggle_pause', { method: 'POST' });
-                await loadData();
+                await loadData(true);
             } catch (err) {
                 alert("Erro ao alterar estado do servidor.");
             }
@@ -2018,7 +2169,10 @@
                     alert(result.error);
                 } else {
                     switchTab('feed');
-                    await loadData();
+                    dismissNewPostsToast();
+                    pendingNewData = null;
+                    await loadData(true);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             } catch (err) {
                 console.error("Erro no ciclo:", err);
@@ -2033,16 +2187,9 @@
 
         let currentActiveTopic = null;
 
-        // Atualiza a tela a cada 5 segundos para refletir novos tratados
-        loadData();
-        setInterval(loadData, 5000);
-
-        // Ciclo de interação contínua autônoma entre os teólogos (sem trava)
-        setInterval(() => {
-            if (!isPaused && !isCycleInProgress) {
-                runStudyCycle();
-            }
-        }, 30000);
+        // Atualização em segundo plano suave a cada 8 segundos (sem recriar DOM nem mover a leitura)
+        loadData(true);
+        setInterval(() => loadData(false), 8000);
     </script>
 </body>
 </html>
