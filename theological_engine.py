@@ -212,46 +212,186 @@ THEOLOGICAL_TOPICS_DATABASE = {
         "hebrew_parallels": [
             ("פָּרֹכֶת", "parokhet", "Strong H6532", "https://biblehub.com/hebrew/6532.htm", "O véu sagrado tecido com azul, púrpura, carmesim e querubins bordados, que guardava a presença de Deus.")
         ]
+    },
+    "fim_dos_tempos": {
+        "keywords": [
+            "fim dos tempos", "escatologia", "volta de cristo", "segunda vinda", 
+            "apocalipse", "parousia", "arrebatamento", "tribulação", "tribulacao", 
+            "últimos dias", "ultimos dias", "daniel 12", "daniel 9", "mateus 24", 
+            "juízo final", "juizo final", "dia do senhor", "maranata", "novo céu", 
+            "novo ceu", "consumação", "consumacao", "fim"
+        ],
+        "verse_ref": "Mateus 24:14, 29-31 / Apocalipse 22:12-13",
+        "verse_text": "E este evangelho do reino será pregado em todo o mundo, em testemunho a todas as gentes, e então virá o fim... E, logo depois da aflição daqueles dias, o sol escurecerá, e a lua não dará a sua luz... e verão o Filho do Homem vindo sobre as nuvens do céu, com poder e grande glória... E eis que cedo venho, e o meu galardão está comigo, para dar a cada um segundo a sua obra.",
+        "era": "Consumação Escatológica & Século I d.C. (Discurso no Monte das Oliveiras e Apocalipse na Ilha de Patmos)",
+        "historical_context": (
+            "1. **O Cenário Histórico no Monte das Oliveiras e a Revelação na Ilha de Patmos:**\n"
+            "   Ao contemplar o Templo de Jerusalém a partir do Monte das Oliveiras (Mateus 24), Jesus responde aos discípulos sobre os sinais da Sua vinda (*parousia*) e do fim da era presente (*synteleia tou aiōnos*). Posteriormente, no final do século I d.C., sob a severa perseguição do imperador Domiciano, o apóstolo João recebe o Apocalipse na prisão da ilha de Patmos, revelando que os impérios humanos são efêmeros e que o Cordeiro imolado reina soberanamente sobre a história humana.\n\n"
+            "2. **A Convergência dos Oráculos de Daniel e dos Profetas:**\n"
+            "   A escatologia bíblica não é especulação moderna: ela cumpre com rigor os oráculos dados a Daniel no exílio babilônico (Daniel 7, 9 e 12) e a Isaías (Isaías 65-66). Os manuscritos proféticos de Qumran ([Rolos do Mar Morto](https://www.deadseascrolls.org.il/)) atestam que a comunidade pactual vivia em intensa expectativa do 'Fim dos Dias' (*Acharit Ha-Yamim*), apontando para a redenção definitiva operada pelo Ungido de Yahweh."
+        ),
+        "typological_context": (
+            "1. **A Parusia e o Triunfo Cósmico do Cordeiro:**\n"
+            "   Na Sua primeira vinda, o Messias veio como o Cordeiro manso para sofrer a morte vicária pelos pecados do Seu povo (Isaías 53; João 1:29). Na Sua segunda vinda no Fim dos Tempos, Ele retorna como o Leão da tribo de Judá e o Rei dos reis (Apocalipse 19:11-16), estabelecendo a justiça eterna e desbaratando todo o império das trevas.\n\n"
+            "2. **A Nova Criação e as Bodas da Noiva:**\n"
+            "   Toda a criação geme aguardando a manifestação dos filhos de Deus (Romanos 8:19-23). O desfecho da história em Apocalipse 21-22 restaura o paraíso perdido de Gênesis: o rio da água da vida, a árvore da vida e a habitação perpétua de Deus com os Seus redimidos em santidade sem fim."
+        ),
+        "application_context": (
+            "1. **Vigilância Sóbria, Esperança Viva e Santidade:**\n"
+            "   A certeza do Fim dos Tempos não gera histeria ou medo apocalíptico no adorador regenerado, mas purificação do coração, fidelidade e amor sincero (1 João 3:2-3). Prostrados em oração diária, clamamos com a Noiva: *'Maranata! Ora vem, Senhor Jesus!'*\n\n"
+            "2. **Adoração em Espírito e em Verdade perante o Trono:**\n"
+            "   A escatologia bíblica culmina em doxologia eterna. Como adoradores em Espírito e em Verdade (João 4:23-24), vivemos na terra como embaixadores do Reino Vindouro, praticando o amor ao próximo, a pregação incansável da graça e a santidade no quarto secreto."
+        ),
+        "greek_terms": [
+            ("ἔσχατος", "eschatos", "Strong G2078", "https://biblehub.com/greek/2078.htm", "Último, extremo, consumação final. No grego do Novo Testamento, refere-se aos 'últimos dias' (eschatais hēmerais) e ao desfecho dos decretos eternos de Deus."),
+            ("παρουσία", "parousia", "Strong G3952", "https://biblehub.com/greek/3952.htm", "Presença pessoal, advento e vinda gloriosa visível do Senhor Jesus Cristo como Rei e Juiz triunfante perante toda a criação."),
+            ("συντέλεια", "synteleia", "Strong G4930", "https://biblehub.com/greek/4930.htm", "Consumação, término pleno e desfecho vitorioso da era presente (synteleia tou aiōnos - Mateus 24:3 e 28:20)."),
+            ("ἀποκάλυψις", "apokalypsis", "Strong G601", "https://biblehub.com/greek/601.htm", "Descortinar celestial, manifestação e revelação sem véus da glória incontestável de Jesus Cristo perante as nações.")
+        ],
+        "hebrew_parallels": [
+            ("אַחֲרִית הַיָּמִים", "acharit ha-yamim", "Strong H319", "https://biblehub.com/hebrew/319.htm", "O fim dos dias, a posteridade profética e a consumação do tempo presente sob a soberania de Yahweh (Daniel 12:4; Isaías 2:2)."),
+            ("יוֹם יְהוָה", "Yom Yahweh", "Strong H3117", "https://biblehub.com/hebrew/3117.htm", "O solene 'Dia do SENHOR', o momento decisivo da intervenção retributiva e redentora de Deus na história humana."),
+            ("עוֹלָם", "olam", "Strong H5769", "https://biblehub.com/hebrew/5769.htm", "A era eterna, o Reino inabalável e sem fim prometido à descendência davídica e cumprido em Cristo Jesus.")
+        ]
+    },
+    "justificacao_pela_fe": {
+        "keywords": [
+            "justificação", "justificacao", "pela fé", "pela fe", "sola fide", 
+            "sola gratia", "graça e fé", "salvação", "salvacao", "graça", "graca", 
+            "romanos 5", "romanos 3", "efésios 2", "efesios 2"
+        ],
+        "verse_ref": "Romanos 5:1-2 / Efésios 2:8-9",
+        "verse_text": "Tendo sido, pois, justificados pela fé, temos paz com Deus por nosso Senhor Jesus Cristo; por quem também temos entrada pela fé a esta graça, na qual estamos firmes... Porque pela graça sois salvos, por meio da fé; e isso não vem de vós, é dom de Deus; não de obras, para que ninguém se glorie.",
+        "era": "Século I d.C. (Epístolas Paulinas aos Romanos e Efésios)",
+        "historical_context": (
+            "1. **O Contexto da Igreja do Primeiro Século:**\n"
+            "   Paulo escreve às comunidades em Roma e Éfeso confrontando o legalismo judaizante que exigia a observância das obras da Lei Mosaica como requisito para a salvação. O apóstolo demonstra que tanto judeus quanto gentios estão destituídos da glória de Deus e que a redenção é outorgada exclusivamente pela fé no sangue expiatório de Cristo.\n\n"
+            "2. **A Reforma da Compreensão da Justiça:**\n"
+            "   Citando Habacuque 2:4 ('o justo viverá pela fé'), Paulo resgata o cerne do evangelho: a justiça de Deus não é alcançada pelo esforço moral humano, mas imputada graciosamente à conta do pecador que crê no Salvador."
+        ),
+        "typological_context": (
+            "1. **A Imputação da Justiça de Cristo:**\n"
+            "   Assim como o pecado de Adão trouxe condenação a todos, a perfeita obediência e o sacrifício de Cristo no Calvário imputam justiça viva e eterna aos remidos (Romanos 5:18-19; 2 Coríntios 5:21).\n\n"
+            "2. **Paz Pactual Irrevogável com o Pai:**\n"
+            "   A justificação extingue toda inimizade e ira judicial. O adorador justificado não vive sob o terror da condenação, mas sob a bandeira da paz e da adoção filial pelo Espírito Santo."
+        ),
+        "application_context": (
+            "1. **Descanso da Alma na Obra Consumada de Cristo:**\n"
+            "   Longe de qualquer orgulho farisaico ou penitência vazia, a salvação pela graça gera profunda humildade, lágrimas de gratidão e devoção sincera.\n\n"
+            "2. **Adoração em Espírito e em Verdade:**\n"
+            "   Adorar a Deus sabendo-se justificado pelo sangue do Cordeiro transforma o culto em um transbordar espontâneo de louvor e obediência alegre no dia a dia."
+        ),
+        "greek_terms": [
+            ("δικαιόω", "dikaioō", "Strong G1344", "https://biblehub.com/greek/1344.htm", "Declarar justo, absolver judicialmente com base nos méritos perfeitos de Cristo imputados ao crente."),
+            ("χάρις", "charis", "Strong G5485", "https://biblehub.com/greek/5485.htm", "Graça imerecida, favor soberano e amor salvador outorgado livremente por Deus."),
+            ("πίστις", "pistis", "Strong G4102", "https://biblehub.com/greek/4102.htm", "Fé fiduciária viva, entrega incondicional e confiança total na promessa de Deus em Jesus."),
+            ("εἰρήνη", "eirēnē", "Strong G1515", "https://biblehub.com/greek/1515.htm", "Paz e reconciliação harmoniosa com Deus que excede todo o entendimento.")
+        ],
+        "hebrew_parallels": [
+            ("צְדָקָה", "tzedakah", "Strong H6666", "https://biblehub.com/hebrew/6666.htm", "Justiça divina, retidão e fidelidade pactual."),
+            ("חֵן", "chen", "Strong H2580", "https://biblehub.com/hebrew/2580.htm", "Graça, favor e misericórdia imerecida outorgada por Yahweh."),
+            ("אֱמוּנָה", "emunah", "Strong H530", "https://biblehub.com/hebrew/530.htm", "Fidelidade e confiança constante no Senhor (Habacuque 2:4).")
+        ]
+    },
+    "bom_pastor_salmo_23": {
+        "keywords": [
+            "salmo 23", "o senhor é meu pastor", "o senhor e meu pastor", 
+            "bom pastor", "pastor de ovelhas", "águas de descanso", "aguas de descanso"
+        ],
+        "verse_ref": "Salmo 23:1-3 / João 10:11",
+        "verse_text": "O SENHOR é o meu pastor; nada me faltará. Deitar-me faz em verdes pastos, guia-me mansamente a águas mansas. Refrigera a minha alma; guia-me pelas veredas da justiça por amor do seu nome... Eu sou o bom pastor; o bom pastor dá a sua vida pelas ovelhas.",
+        "era": "Monarquia Unida de Israel (século X a.C.) & Ministério de Cristo (século I d.C.)",
+        "historical_context": (
+            "1. **O Contexto Davídico do Salmo 23:**\n"
+            "   Davi, outrora jovem pastor nos desertos da Judeia e depois rei de Israel, compõe este cântico conhecendo por experiência própria o desvelo, a coragem e a vigilância constante exigidos para proteger o rebanho contra predadores e desfiladeiros perigosos.\n\n"
+            "2. **A Revelação em João 10:**\n"
+            "   Jesus assume para Si o título divino de Yahweh Pastor (Ezequiel 34), contrastando Sua dedicação sacrificial com os mercenários religiosos de Jerusalém. Ele conhece Suas ovelhas pelo nome e dá Sua vida por elas."
+        ),
+        "typological_context": (
+            "1. **De Davi ao Supremo Pastor das Almas:**\n"
+            "   O cajado e a vara que consolavam as ovelhas terrenas prefiguram o cuidado soberano e a proteção infalível de Cristo para com a Sua Igreja peregrina na terra.\n\n"
+            "2. **A Mesa Preparada na Presença dos Inimigos:**\n"
+            "   O banquete abundante no meio da batalha espiritual aponta para a Ceia da graça e a comunhão inabalável com Deus mesmo nos vales mais escuros da existência."
+        ),
+        "application_context": (
+            "1. **Cura da Ansiedade e Descanso Pleno:**\n"
+            "   'Nada me faltará' não é promessa de luxo material egoísta, mas a certeza inegociável de que o Pastor celestial supre todas as nossas necessidades físicas e espirituais.\n\n"
+            "2. **Adoração em Espírito e em Verdade no Vale:**\n"
+            "   Ainda que atravessemos o vale da sombra da morte, não tememos mal algum, pois o Pastor está conosco no quarto secreto e em cada passo da jornada."
+        ),
+        "greek_terms": [
+            ("ποιμήν", "poimēn", "Strong G4166", "https://biblehub.com/greek/4166.htm", "Pastor, guia fiel que alimenta, protege e zela pelas ovelhas."),
+            ("καλός", "kalos", "Strong G2570", "https://biblehub.com/greek/2570.htm", "Bom, nobre, perfeito e belo moralmente. 'Eu sou o Bom Pastor' (Ho Poimēn ho Kalos).")
+        ],
+        "hebrew_parallels": [
+            ("רָעָה", "ra'ah", "Strong H7462", "https://biblehub.com/hebrew/7462.htm", "Apascentar, pastorear e cuidar com afeto constante. 'Yahweh Ro'i' — O SENHOR é meu pastor."),
+            ("יַחְסַר", "yachsar", "Strong H2637", "https://biblehub.com/hebrew/2637.htm", "Faltar, ter carência ou privação. 'Lo echsar' — nada me faltará."),
+            ("מְנוּחָה", "menuchah", "Strong H4496", "https://biblehub.com/hebrew/4496.htm", "Águas de descanso e repouso sereno da alma.")
+        ]
     }
 }
 
 def identify_theological_context(topic: str) -> Dict[str, Any]:
-    t_low = topic.lower()
+    t_low = (topic or "").lower().strip()
+
+    # 1. Busca exata ou por palavra-chave na base especializada
     for key, data in THEOLOGICAL_TOPICS_DATABASE.items():
         for kw in data["keywords"]:
             if kw in t_low:
                 return data
-    # Fallback contextual nobre e universal
+
+    # 2. Heurística Semântica Inteligente por Família Teológica:
+    if any(w in t_low for w in ["fim", "escatol", "apocalip", "volta", "tribula", "arrebat", "profec", "juízo", "juizo", "dia do senhor", "segunda vinda"]):
+        return THEOLOGICAL_TOPICS_DATABASE["fim_dos_tempos"]
+    if any(w in t_low for w in ["salva", "graça", "graca", "justific", "fé", "fe", "perdão", "perdao", "redenção", "redencao"]):
+        return THEOLOGICAL_TOPICS_DATABASE["justificacao_pela_fe"]
+    if any(w in t_low for w in ["pastor", "ovelha", "salmo 23", "refrigério", "refrigerio"]):
+        return THEOLOGICAL_TOPICS_DATABASE["bom_pastor_salmo_23"]
+    if any(w in t_low for w in ["adora", "culto", "louvor", "samaritan"]):
+        return THEOLOGICAL_TOPICS_DATABASE["adoracao_espirito_verdade"]
+    if any(w in t_low for w in ["tabernác", "tabernac", "arca", "santuário", "santuario"]):
+        return THEOLOGICAL_TOPICS_DATABASE["tabernaculo"]
+    if any(w in t_low for w in ["véu", "veu"]):
+        return THEOLOGICAL_TOPICS_DATABASE["veu_rasgado"]
+    if any(w in t_low for w in ["ceia", "cálice", "calice", "pão", "pao", "memorial", "eucarist"]):
+        return THEOLOGICAL_TOPICS_DATABASE["ceia_do_senhor"]
+    if any(w in t_low for w in ["ezequiel", "vingança", "vinganca", "filiste"]):
+        return THEOLOGICAL_TOPICS_DATABASE["ezequiel_25_17"]
+    if any(w in t_low for w in ["amor", "unigênit", "unigenit", "joão 3", "joao 3"]):
+        return THEOLOGICAL_TOPICS_DATABASE["joao_3_16"]
+
+    # 3. Fallback Cristocêntrico Soberano (Colossenses 1:16-20 / A Supremacia de Cristo em Toda a Escritura)
     return {
-        "keywords": [topic.lower()],
-        "verse_ref": "2 Timóteo 3:16-17 / Hebreus 4:12",
-        "verse_text": "Toda a Escritura é divinamente inspirada por Deus e proveitosa para ensinar, redarguir, corrigir e instruir em justiça... Porque a palavra de Deus é viva e eficaz, mais penetrante do que qualquer espada de dois gumes.",
-        "era": "Cânon Sagrado Unificado (Gênesis a Apocalipse)",
+        "keywords": [t_low],
+        "verse_ref": "Colossenses 1:16-20 / Efésios 1:9-10",
+        "verse_text": "Porque nele foram criadas todas as coisas que há nos céus e na terra, visíveis e invisíveis... tudo foi criado por ele e para ele. E ele é antes de todas as coisas, e todas as coisas subsistem por ele... e ele é a cabeça do corpo da igreja... havendo por ele feito a paz pelo sangue da sua cruz.",
+        "era": "Cânon Sagrado Unificado & A Supremacia Cósmica de Cristo",
         "historical_context": (
-            f"1. **O Cenário Histórico-Bíblico de '{topic}':**\n"
-            "   A revelação das Escrituras Sagradas não consiste em abstrações filosóficas, mas em intervenções vivas do Deus Todo-Poderoso registradas em coordenadas históricas exatas e preservadas com fidelidade providencial.\n\n"
-            "2. **Evidências Documentais Primárias:**\n"
-            "   Os códices antigos e os manuscritos originais testemunham a integridade inerrante do texto bíblico através de todas as eras e impérios."
+            f"1. **O Contexto Histórico e Canônico de '{topic}':**\n"
+            f"   Ao examinarmos a perícope sagrada que ilumina '{topic}', contemplamos o Deus que fala na história. As Escrituras não são abstrações mitológicas, mas intervenções verídicas de Yahweh testemunhadas pelos profetas e apóstolos e preservadas nos códices antigos.\n\n"
+            f"2. **A Fidelidade dos Manuscritos:**\n"
+            f"   Do Texto Massorético aos pergaminhos gregos do Novo Testamento, a integridade do texto sagrado permanece inabalável, revelando a fidelidade da aliança eterna estabelecida pelo Criador."
         ),
         "typological_context": (
-            f"1. **A Revelação das Alianças em '{topic}':**\n"
-            "   Toda a Escritura converge organicamente para a majestade de Cristo Jesus e para o plano soberano de redenção estabelecido pelo Pai antes da fundação do mundo.\n\n"
-            "2. **A Consumação Eterna:**\n"
-            "   Da promessa profética à consumação na cruz, a Palavra de Deus permanece inabalável e cumpre soberanamente todos os desígnios eternos."
+            f"1. **A Centralidade Absoluta de Jesus Cristo em '{topic}':**\n"
+            f"   Toda a revelação das Escrituras converge para a pessoa de Cristo Jesus. Nele habitam todos os tesouros da sabedoria e do conhecimento (Colossenses 2:3). Da promessa da redenção à consumação na cruz, tudo foi planejado para a glória do Filho de Deus.\n\n"
+            f"2. **A Reconciliação na Cruz do Calvário:**\n"
+            f"   Pelo sangue da Sua cruz, Jesus reconciliou consigo todas as coisas, inaugurando uma Nova Aliança eterna que liberta o homem da culpa do pecado e o introduz na paz santa com o Pai."
         ),
         "application_context": (
-            "1. **Adoração em Espírito e em Verdade (João 4:23-24):**\n"
-            "   O estudo bíblico genuíno nos arranca do orgulho acadêmico e nos conduz ao quebrantamento e intimidade filial com o Senhor.\n\n"
-            "2. **O Poder de Deus na Prática:**\n"
-            "   A verdade divina transforma o caráter, a família e a oração no quarto secreto em um testemunho vivo para a glória de Deus."
+            f"1. **Adoração em Espírito e em Verdade (João 4:23-24):**\n"
+            f"   Conhecer a profundidade de '{topic}' não serve para alimentar debates estéreis, mas para nos levar a dobrar os joelhos em adoração sincera, quebrantamento e temor filial diante do Trono da Graça.\n\n"
+            f"2. **Vida Prática e Santificação Diária:**\n"
+            f"   A verdade bíblica regenera o viver diário. Em oração constante no quarto secreto e em santidade, refletimos a luz de Cristo em nosso testemunho cotidiano."
         ),
         "greek_terms": [
-            ("θεόπνευστος", "theopneustos", "Strong G2315", "https://biblehub.com/greek/2315.htm", "Soprada por Deus (Theos + Pneō). As Escrituras contêm a própria respiração vital e autoridade inerrante do Criador."),
-            ("λόγος", "logos", "Strong G3056", "https://biblehub.com/greek/3056.htm", "A Palavra viva e revelada, que se encarnou em Jesus Cristo para redimir os santos.")
+            ("πρωτότοκος", "prōtotokos", "Strong G4416", "https://biblehub.com/greek/4416.htm", "Primogênito de toda a criação / supremo em dignidade e autoridade cósmica soberana."),
+            ("πλήρωμα", "plērōma", "Strong G4138", "https://biblehub.com/greek/4138.htm", "Plenitude divina. Em Cristo habita corporalmente toda a plenitude da divindade."),
+            ("ἀποκαταλλάσσω", "apokatallassō", "Strong G604", "https://biblehub.com/greek/604.htm", "Reconciliação total, completa e definitiva realizada pelo sangue derramado na cruz.")
         ],
         "hebrew_parallels": [
-            ("דָּבָר", "davar", "Strong H1697", "https://biblehub.com/hebrew/1697.htm", "A Palavra soberana de Yahweh que realiza tudo o que Lhe agrada e não volta vazia (Isaías 55:11)."),
-            ("תּוֹרָה", "torah", "Strong H8451", "https://biblehub.com/hebrew/8451.htm", "A instrução santa e o ensino divino que ilumina os olhos e alegra o coração (Salmo 19:7).")
+            ("רֵאשִׁית", "reshit", "Strong H7225", "https://biblehub.com/hebrew/7225.htm", "Princípio soberano, primícias de toda a obra criadora e redentora de Yahweh."),
+            ("שָׁלוֹם", "shalom", "Strong H7965", "https://biblehub.com/hebrew/7965.htm", "Paz pactual plena e reconciliação definitiva outorgada pelo Messias de Deus.")
         ]
     }
 
