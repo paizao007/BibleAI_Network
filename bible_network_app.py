@@ -69,10 +69,12 @@ class OllamaBibleAgentEngine:
 
         candidate_models = [
             self.gemini_model,
+            "gemini-3.7-flash",
+            "gemma-4-26b-a4b-it",
+            "gemini-3.8-flash",
             "gemini-flash-latest",
-            "gemini-2.5-flash",
-            "gemini-3.5-flash",
-            "gemini-3.6-flash"
+            "gemini-3.6-flash",
+            "gemini-3.5-flash"
         ]
         # Remove duplicatas preservando ordem
         candidate_models = list(dict.fromkeys(candidate_models))
