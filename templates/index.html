@@ -1226,10 +1226,26 @@
             }
         }
 
-        /* CELULAR: Remover caixa de seleção de IA e compactar cabeçalho */
+        .btn-pause-toggle {
+            transition: all 0.25s ease;
+            font-weight: 700;
+        }
+
+        .btn-pause-toggle.paused-state {
+            background: linear-gradient(135deg, #1b4d3e 0%, #0d281e 100%) !important;
+            border: 1.5px solid #48bb78 !important;
+            color: #c6f6d5 !important;
+            font-weight: 800 !important;
+            box-shadow: 0 0 10px rgba(72, 187, 120, 0.4) !important;
+        }
+
+        /* CELULAR: Remover caixa de seleção de IA e desligar servidor para proteção */
         @media (max-width: 768px) {
             .header-engine-box {
                 display: none !important; /* REMOVER ESSA CAIXA PARA VERSÃO CELULAR */
+            }
+            .btn-shutdown {
+                display: none !important; /* DESLIGAR SERVIDOR NUNCA FICA DISPONÍVEL NO CELULAR */
             }
         }
 
@@ -1362,8 +1378,8 @@
                     <button type="button" class="btn-font-toggle" id="font-btn-xlarge" onclick="setFontSize('xlarge')" title="Tamanho Extra Grande">A++</button>
                 </div>
 
-                <button id="btn-pause" class="btn-control" onclick="togglePause()">⏸️ Pausar</button>
-                <button class="btn-control danger" onclick="shutdownServer()">🛑 Desligar</button>
+                <button id="btn-pause" class="btn-control btn-pause-toggle" onclick="togglePause()" title="Pausar ou retomar pesquisas e debates automáticos">⏸️ Pausar Interações</button>
+                <button class="btn-control danger btn-shutdown" onclick="shutdownServer()" title="Encerrar o servidor">🛑 Desligar</button>
             </div>
         </div>
 
@@ -1436,6 +1452,10 @@
                         <div class="hero-stat-card">
                             <span class="hero-stat-num">100%</span>
                             <span class="hero-stat-label">Manuscritos Conectados</span>
+                        </div>
+                        <div class="hero-stat-card" id="card-server-status">
+                            <span class="hero-stat-num" id="stat-server-status" style="font-size: 1.6rem; color: #22543d;">🟢 Ativo</span>
+                            <span class="hero-stat-label" id="stat-server-status-label">Modo Autônomo</span>
                         </div>
                     </div>
                     <div class="hero-actions-row">
@@ -1988,21 +2008,36 @@
                 const data = await res.json();
                 
                 // Server Pause status
-                isPaused = data.is_paused;
+                isPaused = !!data.is_paused;
                 const btnPause = document.getElementById('btn-pause');
+                const statServerStatus = document.getElementById('stat-server-status');
+                const statServerStatusLabel = document.getElementById('stat-server-status-label');
                 if (btnPause) {
                     if (isPaused) {
                         btnPause.innerText = '▶️ Retomar Interações';
-                        btnPause.style.background = '#22543d';
-                        btnPause.style.borderColor = '#48bb78';
-                        btnPause.style.color = '#c6f6d5';
-                        btnPause.title = 'As interações autônomas estão pausadas por você. Clique para retomar a qualquer momento.';
+                        btnPause.classList.add('paused-state');
+                        btnPause.style.background = '';
+                        btnPause.style.borderColor = '';
+                        btnPause.style.color = '';
+                        btnPause.title = 'As pesquisas autônomas estão pausadas. Clique para retomar a qualquer momento.';
                     } else {
                         btnPause.innerText = '⏸️ Pausar Interações';
+                        btnPause.classList.remove('paused-state');
                         btnPause.style.background = 'rgba(212, 175, 55, 0.2)';
                         btnPause.style.borderColor = 'var(--border-gold)';
                         btnPause.style.color = '#f3e5ab';
-                        btnPause.title = 'Clique para pausar as interações autônomas dos teólogos a qualquer momento.';
+                        btnPause.title = 'Clique para pausar as pesquisas e debates autônomos dos teólogos a qualquer momento.';
+                    }
+                }
+                if (statServerStatus && statServerStatusLabel) {
+                    if (isPaused) {
+                        statServerStatus.innerText = '⏸️ Pausado';
+                        statServerStatus.style.color = '#8b261b';
+                        statServerStatusLabel.innerText = 'Em Repouso';
+                    } else {
+                        statServerStatus.innerText = '🟢 Ativo';
+                        statServerStatus.style.color = '#22543d';
+                        statServerStatusLabel.innerText = 'Modo Autônomo';
                     }
                 }
 
@@ -2126,12 +2161,32 @@
         }
 
         async function togglePause() {
+            const btn = document.getElementById('btn-pause');
+            if (btn) btn.disabled = true;
             try {
-                await fetch('/api/toggle_pause', { method: 'POST' });
+                const res = await fetch('/api/toggle_pause', { method: 'POST' });
+                const result = await res.json();
+                const paused = result.is_paused;
+                showToastMessage(paused ? '⏸️ Pesquisas autônomas pausadas! O servidor está em repouso.' : '▶️ Pesquisas autônomas retomadas com sucesso!');
                 await loadData(true);
             } catch (err) {
                 alert("Erro ao alterar estado do servidor.");
+            } finally {
+                if (btn) btn.disabled = false;
             }
+        }
+
+        function showToastMessage(msg) {
+            let toast = document.getElementById('toast-feedback');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'toast-feedback';
+                toast.className = 'new-posts-toast';
+                document.body.appendChild(toast);
+            }
+            toast.innerText = msg;
+            toast.style.display = 'inline-flex';
+            setTimeout(() => { if (toast) toast.remove(); }, 3500);
         }
 
         async function shutdownServer() {

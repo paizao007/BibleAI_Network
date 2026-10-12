@@ -339,7 +339,7 @@ def index():
 @app.route('/api/data')
 def get_data():
     db = load_db()
-    db["is_paused"] = is_paused
+    db["is_paused"] = db.get("is_paused", False)
     db["engine_info"] = ai_engine.model
     topics = db.get("topics", [])
     active_topic = topics[0] if topics else "O Amor Redentor em João 3:16"
@@ -377,10 +377,13 @@ def delete_topic():
 
 @app.route('/api/toggle_pause', methods=['POST'])
 def toggle_pause():
-    global is_paused
-    is_paused = not is_paused
-    print(f"[⏸️] Estado do Servidor alterado: Pausado={is_paused}")
-    return jsonify({"success": True, "is_paused": is_paused})
+    db = load_db()
+    current_status = db.get("is_paused", False)
+    new_status = not current_status
+    db["is_paused"] = new_status
+    save_db(db)
+    print(f"[⏸️] Estado do Servidor alterado e salvo em bible_data.json: is_paused={new_status}")
+    return jsonify({"success": True, "is_paused": new_status})
 
 @app.route('/api/set_engine', methods=['POST'])
 def set_engine():
@@ -418,10 +421,10 @@ def shutdown():
     threading.Thread(target=stop_server).start()
     return jsonify({"success": True, "message": "Servidor sendo desligado com segurança."})
 
-def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None):
-    global is_paused
-    if is_paused:
-        return {"error": "O servidor está pausado."}
+def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is_manual=False):
+    db = load_db()
+    if not is_manual and db.get("is_paused", False):
+        return {"status": "paused", "message": "O ciclo autônomo está pausado pelo usuário."}
 
     # Bloqueio leve não-bloqueante para evitar conflitos concorrentes
     if not cycle_lock.acquire(blocking=False):
@@ -540,7 +543,7 @@ def run_cycle():
     req_data = request.get_json() if request.is_json else {}
     selected_topic = req_data.get("topic") if req_data else None
     selected_agent_id = req_data.get("agent_id") if req_data else None
-    result = execute_study_cycle_internal(selected_topic, selected_agent_id)
+    result = execute_study_cycle_internal(selected_topic, selected_agent_id, is_manual=True)
     if "error" in result:
         return jsonify(result), 400
     return jsonify(result)
@@ -550,12 +553,14 @@ def background_generation_loop():
     time.sleep(6)  # Aguarda servidor iniciar
     while True:
         time.sleep(60)  # Interação contínua autônoma equilibrada e anti-duplicação
-        global is_paused
-        if not is_paused:
-            try:
-                execute_study_cycle_internal()
-            except Exception as e:
-                print(f"[Loop Autônomo] Interação: {e}")
+        try:
+            db = load_db()
+            if not db.get("is_paused", False):
+                execute_study_cycle_internal(is_manual=False)
+            else:
+                print("[⏸️ Loop Autônomo] Em repouso (pesquisas autônomas pausadas pelo usuário).")
+        except Exception as e:
+            print(f"[Loop Autônomo] Interação: {e}")
 
 threading.Thread(target=background_generation_loop, daemon=True).start()
 
