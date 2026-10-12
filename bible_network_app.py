@@ -321,10 +321,29 @@ Trecho Central do Estudo: "{post_content[:1100]}..."
 ai_engine = OllamaBibleAgentEngine()
 
 # --- HELPER DATABASE FUNCTIONS ---
+LEGACY_FIXED_TOPICS = {
+    "Ezequiel 25:17",
+    "O Amor Redentor em João 3:16",
+    "O Sacrifício e o Amor de Deus em João 3:16",
+    "A Ceia do Senhor: Memorial ou Transubstanciacao",
+    "O Tabernáculo de Moisés e a Tipologia de Cristo",
+    "A Palavra Graça: Hesed no Hebraico vs Charis no Grego",
+    "O Véu do Templo Rasgado: O Significado Teológico e Histórico",
+    "Adoração em Espírito e em Verdade (João 4:23-24): Liberdade da Lei e Intimidade com Cristo",
+    "As 70 Semanas de Daniel e as Profecias Messiânicas"
+}
+
 def load_db():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            # Remove qualquer tópico fixo legado que possa existir
+            raw_topics = data.get("topics", [])
+            clean_topics = [t for t in raw_topics if t not in LEGACY_FIXED_TOPICS]
+            if len(clean_topics) != len(raw_topics):
+                data["topics"] = clean_topics
+                save_db(data)
+            return data
     return {"agents": [], "topics": [], "posts": [], "studies": []}
 
 def save_db(data):
