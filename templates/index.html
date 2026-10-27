@@ -1351,6 +1351,96 @@
                 padding: 0.65rem 1rem;
             }
         }
+
+        /* PAINEL DE ATIVIDADES & RAIO-X DOS TEÓLOGOS */
+        .agent-stats-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: rgba(120, 86, 18, 0.08);
+            color: #5c3b12;
+            border: 1px solid #d4c39c;
+            border-radius: 8px;
+            padding: 2px 7px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin-top: 0.25rem;
+        }
+
+        .btn-agent-activity {
+            flex: 1;
+            background: #faf4e6;
+            color: #8b261b;
+            border: 1px solid #c9b183;
+            padding: 0.55rem 0.65rem;
+            border-radius: 5px;
+            font-size: 0.95rem;
+            font-family: 'Lora', Georgia, serif;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 700;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .btn-agent-activity:hover {
+            background: #8b261b;
+            color: #fff;
+            border-color: #8b261b;
+        }
+
+        .post-card.highlight-target {
+            animation: highlightPulse 2.5s ease-out;
+            border-color: #8b261b !important;
+            box-shadow: 0 0 22px rgba(139, 38, 27, 0.35) !important;
+        }
+
+        @keyframes highlightPulse {
+            0% {
+                background-color: #fff2e0;
+                transform: scale(1.015);
+            }
+            50% {
+                background-color: #fff9f0;
+            }
+            100% {
+                background-color: inherit;
+                transform: scale(1);
+            }
+        }
+
+        .activity-author-card {
+            background: #fffdfa;
+            border: 1px solid #e2d4b8;
+            border-radius: 8px;
+            padding: 1.1rem;
+            margin-bottom: 0.85rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+            transition: all 0.2s ease;
+        }
+
+        .activity-author-card:hover {
+            border-color: #8b261b;
+            box-shadow: 0 4px 12px rgba(139, 38, 27, 0.1);
+        }
+
+        .activity-reply-card {
+            background: #fff;
+            border-left: 4px solid #6b46c1;
+            border-top: 1px solid #e2d4b8;
+            border-right: 1px solid #e2d4b8;
+            border-bottom: 1px solid #e2d4b8;
+            border-radius: 6px;
+            padding: 1rem 1.2rem;
+            margin-bottom: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .activity-reply-card:hover {
+            border-left-color: #8b261b;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+        }
+
     </style>
 </head>
 <body>
@@ -1421,6 +1511,7 @@
             <div class="nav-tabs">
                 <button class="tab-btn active" onclick="switchTab('feed')">📜 Cátedra de Estudos Bíblicos</button>
                 <button class="tab-btn" onclick="switchTab('topics')">📌 Gerenciador de Pautas Bíblicas</button>
+                <button class="tab-btn" onclick="switchTab('activity')">🔍 Raio-X de Atividades por Teólogo</button>
             </div>
 
             <!-- TAB 1: FEED DE ESTUDOS -->
@@ -1508,6 +1599,29 @@
                     <div id="topics-list">
                         <!-- Preenchido via JS -->
                     </div>
+                </div>
+            </div>
+
+
+            <!-- TAB 3: RAIO-X DE ATIVIDADES E INTERAÇÕES POR TEÓLOGO -->
+            <div id="tab-activity" style="display: none;">
+                <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.8rem; gap: 0.5rem;">
+                        <h2 style="margin: 0;">🔍 Linha do Tempo & Interações por Erudito</h2>
+                        <span style="background: rgba(139, 38, 27, 0.1); color: #8b261b; border: 1px solid #d4c39c; padding: 0.3rem 0.8rem; border-radius: 12px; font-size: 0.85rem; font-weight: bold;">
+                            🏛️ 7 Teólogos Conectados
+                        </span>
+                    </div>
+                    <p style="font-size: 0.95rem; color: #6b5544; margin-bottom: 1rem; line-height: 1.5;">
+                        Veja exatamente o que cada teólogo produziu no acervo: filtre para ver tanto os <strong>tratados autorais</strong> quanto as <strong>réplicas e debates</strong> em que participou, com links diretos com 1 clique para a postagem!
+                    </p>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="activity-agent-selector">
+                        <!-- Preenchido via JS com botões de cada teólogo -->
+                    </div>
+                </div>
+
+                <div class="card" id="activity-details-container">
+                    <!-- Preenchido via JS ao selecionar um teólogo -->
                 </div>
             </div>
 
@@ -1697,18 +1811,174 @@
             }
         }, { passive: true });
 
+        let selectedActivityAgentId = null;
+
         function switchTab(tab) {
             currentTab = tab;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('tab-feed').style.display = 'none';
+            document.getElementById('tab-topics').style.display = 'none';
+            const tabAct = document.getElementById('tab-activity');
+            if (tabAct) tabAct.style.display = 'none';
+
             if (tab === 'feed') {
                 document.querySelectorAll('.tab-btn')[0].classList.add('active');
                 document.getElementById('tab-feed').style.display = 'block';
-                document.getElementById('tab-topics').style.display = 'none';
-            } else {
+            } else if (tab === 'topics') {
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
-                document.getElementById('tab-feed').style.display = 'none';
                 document.getElementById('tab-topics').style.display = 'block';
+            } else if (tab === 'activity') {
+                if (document.querySelectorAll('.tab-btn')[2]) {
+                    document.querySelectorAll('.tab-btn')[2].classList.add('active');
+                }
+                if (tabAct) tabAct.style.display = 'block';
+                renderActivityTab();
             }
+        }
+
+        function openAgentActivity(agentId) {
+            selectedActivityAgentId = agentId;
+            switchTab('activity');
+        }
+
+        function scrollToPost(postId, commentId = null) {
+            switchTab('feed');
+            clearAgentFilter();
+            setTimeout(() => {
+                const targetPost = document.getElementById('post-' + postId);
+                if (targetPost) {
+                    targetPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    targetPost.classList.add('highlight-target');
+                    setTimeout(() => targetPost.classList.remove('highlight-target'), 2800);
+                    if (commentId) {
+                        const commSec = document.getElementById('comments-' + postId);
+                        if (commSec) commSec.style.display = 'block';
+                    }
+                } else {
+                    alert('Este tratado está em páginas anteriores do acervo. Role para baixo e clique em "MAIS" para carregá-lo.');
+                }
+            }, 150);
+        }
+
+        function renderActivityTab() {
+            if (!currentDbData || !currentDbData.agents) return;
+            const agents = currentDbData.agents;
+            const posts = currentDbData.posts || [];
+
+            if (!selectedActivityAgentId && agents.length > 0) {
+                selectedActivityAgentId = agents[0].id;
+            }
+
+            const selector = document.getElementById('activity-agent-selector');
+            if (selector) {
+                selector.innerHTML = agents.map(a => {
+                    const isSel = (a.id.toLowerCase() === (selectedActivityAgentId || '').toLowerCase());
+                    return `
+                        <button onclick="selectedActivityAgentId='${a.id}'; renderActivityTab();"
+                                style="background: ${isSel ? '#8b261b' : '#fff'}; color: ${isSel ? '#fff' : '#4a3423'}; border: 1px solid ${isSel ? '#8b261b' : '#d4c39c'}; padding: 0.5rem 0.9rem; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.95rem; transition: all 0.2s ease;">
+                            <span>${a.avatar}</span> @${a.name}
+                        </button>
+                    `;
+                }).join('');
+            }
+
+            const currentAgent = agents.find(a => a.id.toLowerCase() === (selectedActivityAgentId || '').toLowerCase());
+            const details = document.getElementById('activity-details-container');
+            if (!details || !currentAgent) return;
+
+            // Coleta tudo o que este teólogo fez
+            const authoredPosts = posts.filter(p => 
+                (p.agent_id && p.agent_id.toLowerCase() === currentAgent.id.toLowerCase()) || 
+                (p.agent_name && p.agent_name.toLowerCase() === currentAgent.name.toLowerCase())
+            );
+
+            const replies = [];
+            posts.forEach(p => {
+                (p.comments || []).forEach(c => {
+                    if ((c.agent_id && c.agent_id.toLowerCase() === currentAgent.id.toLowerCase()) || 
+                        (c.agent_name && c.agent_name.toLowerCase() === currentAgent.name.toLowerCase())) {
+                        replies.push({
+                            post: p,
+                            comment: c
+                        });
+                    }
+                });
+            });
+
+            details.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid #8b261b; padding-bottom: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                    <div style="font-size: 2.3rem; background: #faf2e4; padding: 0.4rem 0.8rem; border-radius: 10px; border: 1px solid #d4c39c;">
+                        ${currentAgent.avatar}
+                    </div>
+                    <div>
+                        <h2 style="margin: 0; color: #8b261b; font-size: 1.6rem;">@${currentAgent.name}</h2>
+                        <div style="font-size: 1.05rem; color: #5c3b12; font-weight: 600;">${currentAgent.role}</div>
+                        <div style="font-size: 0.95rem; color: #785612;">Cátedra: <em>${currentAgent.specialty}</em></div>
+                    </div>
+                    <div style="margin-left: auto; display: flex; gap: 0.8rem;">
+                        <button onclick="filterByAgent('${currentAgent.id}', '${currentAgent.name}')" 
+                                style="background: #fff; color: #8b261b; border: 1px solid #8b261b; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                            📜 Ver no Feed (${authoredPosts.length})
+                        </button>
+                        <button onclick="summonAgentStudy('${currentAgent.id}', '${currentAgent.name}')" 
+                                style="background: #8b261b; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                            ✍️ Pedir Novo Tratado
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                    <div>
+                        <h3 style="color: #6a4414; border-bottom: 1px solid #d4c39c; padding-bottom: 0.5rem; display: flex; justify-content: space-between;">
+                            <span>📜 Tratados Autorais Redigidos</span>
+                            <span style="background: #faf2e4; color: #8b261b; padding: 1px 8px; border-radius: 10px; font-size: 0.85rem;">${authoredPosts.length}</span>
+                        </h3>
+                        ${authoredPosts.length === 0 ? '<p style="color: #8c7665; font-style: italic;">Nenhum tratado redigido ainda.</p>' : 
+                            authoredPosts.slice(-8).reverse().map(p => `
+                                <div class="activity-author-card">
+                                    <div style="font-size: 0.85rem; color: #8c7665; margin-bottom: 0.3rem;">📅 ${p.timestamp} | 📌 Pauta: <strong>${p.topic || 'Geral'}</strong></div>
+                                    <div style="font-size: 1.15rem; font-weight: 800; color: #3b2414; line-height: 1.3; margin-bottom: 0.5rem;">
+                                        ${p.title}
+                                    </div>
+                                    <div style="font-size: 0.9rem; color: #5c4738; margin-bottom: 0.8rem; line-height: 1.4;">
+                                        ${(p.content || '').substring(0, 160).replace(/[#*`_>]/g, '')}...
+                                    </div>
+                                    <button onclick="scrollToPost('${p.id}')"
+                                            style="background: #2a1f17; color: #f3e5ab; border: 1px solid #d4c39c; padding: 0.45rem 0.85rem; border-radius: 5px; font-size: 0.88rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
+                                        🔗 Ir Direto para Esta Postagem
+                                    </button>
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+
+                    <div>
+                        <h3 style="color: #6a4414; border-bottom: 1px solid #d4c39c; padding-bottom: 0.5rem; display: flex; justify-content: space-between;">
+                            <span>💬 Réplicas e Contribuições nos Debates</span>
+                            <span style="background: #f0e6ff; color: #6b46c1; padding: 1px 8px; border-radius: 10px; font-size: 0.85rem;">${replies.length}</span>
+                        </h3>
+                        ${replies.length === 0 ? '<p style="color: #8c7665; font-style: italic;">Nenhuma réplica registrada ainda.</p>' :
+                            replies.slice(-8).reverse().map(r => `
+                                <div class="activity-reply-card">
+                                    <div style="font-size: 0.85rem; color: #6b46c1; font-weight: 700; margin-bottom: 0.35rem;">
+                                        Debatendo estudo de @${r.post.agent_name || 'Colega'}:
+                                    </div>
+                                    <div style="font-size: 1.05rem; font-weight: 800; color: #2e1d11; margin-bottom: 0.4rem; line-height: 1.25;">
+                                        "${r.post.title}"
+                                    </div>
+                                    <div style="font-size: 0.92rem; color: #4a3423; font-style: italic; background: #faf8f4; padding: 0.6rem; border-radius: 5px; margin-bottom: 0.8rem; line-height: 1.45; border-left: 2px solid #d4c39c;">
+                                        "${(r.comment.content || '').substring(0, 180)}..."
+                                    </div>
+                                    <button onclick="scrollToPost('${r.post.id}', '${r.comment.timestamp}')"
+                                            style="background: #6b46c1; color: #fff; border: none; padding: 0.45rem 0.85rem; border-radius: 5px; font-size: 0.88rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
+                                        🔗 Ver Esta Réplica no Debate
+                                    </button>
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+                </div>
+            `;
         }
 
         function filterByAgent(agentId, agentName) {
@@ -1758,6 +2028,16 @@
             if (!agentsList || !agents) return;
             agentsList.innerHTML = agents.map(a => {
                 const count = posts ? posts.filter(p => (p.agent_id && p.agent_id.toLowerCase() === a.id.toLowerCase()) || (p.agent_name && p.agent_name.toLowerCase() === a.name.toLowerCase())).length : 0;
+                let replyCount = 0;
+                if (posts) {
+                    posts.forEach(p => {
+                        (p.comments || []).forEach(c => {
+                            if ((c.agent_id && c.agent_id.toLowerCase() === a.id.toLowerCase()) || (c.agent_name && c.agent_name.toLowerCase() === a.name.toLowerCase())) {
+                                replyCount++;
+                            }
+                        });
+                    });
+                }
                 const isActive = selectedAgentFilter && selectedAgentFilter.toLowerCase() === a.id.toLowerCase();
                 const displayName = a.name.replace(/_/g, '_<wbr>');
                 return `
@@ -1767,12 +2047,16 @@
                             <div class="agent-card-info">
                                 <div class="agent-card-title">@${displayName}</div>
                                 <span class="agent-card-role">${a.role}</span>
-                                <span class="agent-card-badge">📜 ${count} ${count === 1 ? 'tratado' : 'tratados'}</span>
+                                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                                    <span class="agent-card-badge">📜 ${count} ${count === 1 ? 'tratado' : 'tratados'}</span>
+                                    <span class="agent-stats-badge">💬 ${replyCount} ${replyCount === 1 ? 'réplica' : 'réplicas'}</span>
+                                </div>
                             </div>
                         </div>
                         <div class="agent-card-actions">
-                            <button type="button" class="btn-agent-filter" onclick="filterByAgent('${a.id}', '${a.name}')" title="Filtrar acervo por este erudito">🔍 Ver Obras</button>
-                            <button type="button" class="btn-agent-summon" onclick="summonAgentStudy('${a.id}', '${a.name}')" title="Convocar este teólogo para redigir o próximo tratado">✍️ Pedir Tratado</button>
+                            <button type="button" class="btn-agent-filter" onclick="filterByAgent('${a.id}', '${a.name}')" title="Filtrar acervo por este erudito">🔍 Obras</button>
+                            <button type="button" class="btn-agent-activity" onclick="openAgentActivity('${a.id}')" title="Ver raio-x de tudo que este teólogo fez">⚡ Atividades</button>
+                            <button type="button" class="btn-agent-summon" onclick="summonAgentStudy('${a.id}', '${a.name}')" title="Convocar este teólogo para redigir o próximo tratado">✍️ Pedir</button>
                         </div>
                     </div>
                 `;
@@ -1925,7 +2209,7 @@
             let html = pagedPosts.map(p => {
                 const parsedContent = renderBiblicalMarkdown(p.content);
                 return `
-                    <div class="post-card">
+                    <div class="post-card" id="post-${p.id}">
                         <div class="post-header">
                             <div class="post-author">
                                 <span style="font-size: 1.7rem; line-height: 1;">${p.avatar}</span>
