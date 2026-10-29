@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import re
 import time
 import random
 import requests
@@ -43,24 +44,78 @@ from theological_engine import build_monumental_treatise, build_deep_peer_debate
 
 cycle_lock = threading.Lock()
 
+def extract_json_from_text(raw_text: str):
+    if not raw_text:
+        return None
+    clean = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL).strip()
+    try:
+        return json.loads(clean)
+    except Exception:
+        pass
+
+    if '```json' in clean:
+        try:
+            block = clean.split('```json')[-1].split('```')[0].strip()
+            return json.loads(block)
+        except Exception:
+            pass
+    elif '```' in clean:
+        try:
+            block = clean.split('```')[1].split('```')[0].strip()
+            return json.loads(block)
+        except Exception:
+            pass
+
+    first_brace = clean.find('{')
+    last_brace = clean.rfind('}')
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        try:
+            return json.loads(clean[first_brace:last_brace+1])
+        except Exception:
+            pass
+
+    return None
+
 # --- MOTOR BICAMERAL DE SEGURANÇA E CITATION ENGINE ---
 class OllamaBibleAgentEngine:
-    def __init__(self, model: str = "qwen2.5-coder:7b", host: str = "http://localhost:11434"):
+    def __init__(self, host: str = "http://localhost:11434"):
         self.host = host.rstrip('/')
         raw_keys = os.environ.get("GEMINI_API_KEY", "")
         self.gemini_keys = [k.strip() for k in raw_keys.split(",") if k.strip() and k.strip() not in ["", "sua_chave_aqui"]]
         self.gemini_api_key = self.gemini_keys[0] if self.gemini_keys else None
         self._key_index = 0
             
-        self.active_engine = os.environ.get("ACTIVE_ENGINE", "gemini").lower()
-        self.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-        self.deepseek_model = "deepseek-r1:1.5b"
-        
-        if self.active_engine == "gemini" and self.gemini_api_key:
+        saved_engine = None
+        saved_model = None
+        try:
+            if os.path.exists(DB_FILE):
+                with open(DB_FILE, 'r', encoding='utf-8') as f:
+                    _d = json.load(f)
+                    saved_engine = _d.get("active_engine")
+                    saved_model = _d.get("selected_model")
+        except Exception:
+            pass
+
+        # Preferencia persistida do usuario; padrao e ollama local com gemma3:4b
+        self.active_engine = (saved_engine or os.environ.get("ACTIVE_ENGINE", "ollama")).lower()
+        self.gemini_model = "gemini-3-flash-preview"
+        self.local_model = "llama3.2:1b"
+
+        if saved_model:
+            if "gemini" in saved_model.lower():
+                self.gemini_model = saved_model
+            else:
+                self.local_model = saved_model
+
+        self.selected_model = self.gemini_model if self.active_engine == "gemini" else self.local_model
+        self._update_model_display_name()
+
+    def _update_model_display_name(self):
+        if self.active_engine == "gemini":
             num_keys = len(self.gemini_keys)
             self.model = f"Google Gemini ⚡ ({self.gemini_model}) [{num_keys} chave(s)]"
         elif self.active_engine == "ollama":
-            self.model = f"Ollama Local ({self.deepseek_model} / {model})"
+            self.model = f"Ollama Local 🦙 ({self.local_model})"
         else:
             self.model = "Fallback de Segurança (Nenhum motor válido configurado)"
 
@@ -126,40 +181,59 @@ class OllamaBibleAgentEngine:
 
         raise RuntimeError(f"Gemini API error: {last_err}")
 
-    def _chat_via_ollama(self, messages: List[Dict[str, str]], format: Optional[str] = None, timeout: int = 5) -> Dict[str, Any]:
+    def _chat_via_ollama(self, messages: List[Dict[str, str]], format: Optional[str] = None, timeout: int = 150, max_tokens: int = 800) -> Dict[str, Any]:
         url = f"{self.host}/api/chat"
-        try:
-            payload = {"model": self.deepseek_model, "messages": messages, "stream": False}
-            if format == "json": payload["format"] = "json"
-            r = requests.post(url, json=payload, timeout=timeout)
-            if r.status_code == 200:
-                res = r.json()
-                return {"content": res.get("message", {}).get("content", ""), "model_used": self.deepseek_model}
-        except Exception:
-            pass
+        # Candidatos instalados na maquina do usuario (priorizando llama3.2:1b rapido e estavel em CPU)
+        models_to_try = [self.local_model, "llama3.2:1b", "huihui_ai/deepseek-r1-abliterated:1.5b"]
+        models_to_try = list(dict.fromkeys([m for m in models_to_try if m]))
 
-        try:
-            payload = {"model": "qwen2.5-coder:7b", "messages": messages, "stream": False}
-            if format == "json": payload["format"] = "json"
-            r = requests.post(url, json=payload, timeout=timeout)
-            if r.status_code == 200:
-                res = r.json()
-                return {"content": res.get("message", {}).get("content", ""), "model_used": "Qwen2.5-Coder"}
-        except Exception:
-            pass
-
-        raise RuntimeError("Ollama local indisponível.")
-
-    def chat(self, messages: List[Dict[str, str]], format: Optional[str] = None) -> Dict[str, Any]:
-        if self.gemini_api_key:
+        last_err = None
+        for m_name in models_to_try:
             try:
-                res = self._chat_via_gemini(messages, format=format)
-                return res
+                # num_gpu: 0 garante execucao 100% estavel em CPU sem crash de driver em placas Kepler (GT 740)
+                payload = {
+                    "model": m_name, 
+                    "messages": messages, 
+                    "stream": False,
+                    "options": {
+                        "num_gpu": 0,
+                        "num_predict": max_tokens,
+                        "temperature": 0.7
+                    }
+                }
+                print(f"[🦙 Ollama Local] Processando via '{m_name}' (CPU Estavel, max_tokens={max_tokens}, timeout={timeout}s)...")
+                r = requests.post(url, json=payload, timeout=timeout)
+                if r.status_code == 200:
+                    res = r.json()
+                    raw_content = res.get("message", {}).get("content", "")
+                    clean_content = re.sub(r'<think>.*?</think>', '', raw_content, flags=re.DOTALL).strip()
+                    return {"content": clean_content, "model_used": f"Ollama ({m_name})"}
+                else:
+                    last_err = f"Status {r.status_code}: {r.text[:120]}"
+                    print(f"[!] Erro no modelo local '{m_name}': {last_err}")
             except Exception as e:
-                print(f"[!] Gemini falhou nos candidatos ativos: {e}. Tentando Ollama local...")
-                return self._chat_via_ollama(messages, format=format)
+                last_err = str(e)
+                print(f"[!] Falha no modelo local '{m_name}': {e}. Tentando proximo candidato...")
+                continue
+
+        raise RuntimeError(f"Ollama local indisponivel apos tentar modelos: {last_err}")
+
+    def chat(self, messages: List[Dict[str, str]], format: Optional[str] = None, max_tokens: int = 800) -> Dict[str, Any]:
+        if self.active_engine == "ollama":
+            # 🛡️ Quando configurado como Ollama, NUNCA muda ou chama Gemini!
+            return self._chat_via_ollama(messages, format=format, max_tokens=max_tokens)
+        elif self.active_engine == "gemini":
+            if self.gemini_api_key:
+                try:
+                    return self._chat_via_gemini(messages, format=format)
+                except Exception as e:
+                    print(f"[!] Gemini falhou nos candidatos ativos: {e}. Tentando fallback local Ollama...")
+                    return self._chat_via_ollama(messages, format=format, max_tokens=max_tokens)
+            else:
+                print("[!] Modo Gemini selecionado sem chave API. Utilizando Ollama local...")
+                return self._chat_via_ollama(messages, format=format, max_tokens=max_tokens)
         else:
-            return self._chat_via_ollama(messages, format=format)
+            return self._chat_via_ollama(messages, format=format, max_tokens=max_tokens)
 
     def generate_theological_post(self, agent: Dict[str, Any], topic: str, past_posts: List[Dict[str, Any]] = None) -> Dict[str, str]:
         memory_str = ""
@@ -236,15 +310,10 @@ FORMATO DE SAÍDA EXIGIDO (JSON):
         ]
         
         try:
-            res = self.chat(messages, format="json")
+            res = self.chat(messages, format="json", max_tokens=800)
             raw_text = res["content"].strip()
-            if "```" in raw_text:
-                if "```json" in raw_text:
-                    raw_text = raw_text.split("```json")[-1].split("```")[0].strip()
-                else:
-                    raw_text = raw_text.split("```")[1].split("```")[0].strip()
-            data = json.loads(raw_text)
-            if data.get("content") and len(data["content"]) > 100:
+            data = extract_json_from_text(raw_text)
+            if data and data.get("content") and len(data["content"]) > 100:
                 print(f"[✨ IA REAL - {res.get('model_used')}] Estudo autêntico e inédito gerado para @{agent['name']} sobre '{topic}'!")
                 return data
         except Exception as e:
@@ -302,9 +371,11 @@ Trecho Central do Estudo: "{post_content[:1100]}..."
             {"role": "user", "content": f"Escreva seu comentário fundamentado debatendo a pauta '{topic or post_title}' com @{author_name}."}
         ]
         try:
-            res = self.chat(messages)
+            res = self.chat(messages, max_tokens=300)
             comment = res["content"].strip()
+            comment = re.sub(r'<think>.*?</think>', '', comment, flags=re.DOTALL).strip()
             if len(comment) > 40:
+                print(f"[✨ IA REAL - {res.get('model_used')}] Comentario autentico de @{agent['name']} sobre '{topic or post_title}'!")
                 return comment
         except Exception as e:
             print(f"[!] Erro gerando comentário individual de @{agent['name']}: {e}")
@@ -359,6 +430,8 @@ def index():
 def get_data():
     db = load_db()
     db["is_paused"] = db.get("is_paused", False)
+    db["active_engine"] = ai_engine.active_engine
+    db["selected_model"] = ai_engine.selected_model
     db["engine_info"] = ai_engine.model
     topics = db.get("topics", [])
     if not topics:
@@ -416,29 +489,39 @@ def toggle_pause():
 @app.route('/api/set_engine', methods=['POST'])
 def set_engine():
     req_data = request.get_json() or {}
-    engine = req_data.get('engine', '').lower()
+    engine = req_data.get('engine', '').strip()
     api_key = req_data.get('api_key', '').strip()
     
     if engine:
-        if "gemini" in engine:
+        db = load_db()
+        if "gemini" in engine.lower():
             ai_engine.active_engine = "gemini"
             ai_engine.gemini_model = engine
+            ai_engine.selected_model = engine
+            ai_engine._update_model_display_name()
+            db["active_engine"] = "gemini"
+            db["selected_model"] = engine
         else:
             ai_engine.active_engine = "ollama"
-            ai_engine.deepseek_model = engine
+            ai_engine.local_model = engine
+            ai_engine.selected_model = engine
+            ai_engine._update_model_display_name()
+            db["active_engine"] = "ollama"
+            db["selected_model"] = engine
             
         if api_key and api_key != "sua_chave_aqui":
             ai_engine.gemini_api_key = api_key
+            ai_engine.gemini_keys = [api_key]
             
-        if ai_engine.active_engine == "gemini" and ai_engine.gemini_api_key:
-            ai_engine.model = f"Google Gemini ⚡ ({ai_engine.gemini_model})"
-        elif ai_engine.active_engine == "ollama":
-            ai_engine.model = f"Ollama Local ({ai_engine.deepseek_model})"
-        else:
-            ai_engine.model = "Fallback de Segurança (Nenhum motor válido configurado)"
-            
-        return jsonify({"success": True, "engine_info": ai_engine.model})
-    return jsonify({"error": "Motor inválido"}), 400
+        save_db(db)
+        print(f"[⚙️ Motor Atualizado & Persistido] active_engine={db['active_engine']}, selected_model={db['selected_model']}")
+        return jsonify({
+            "success": True, 
+            "engine_info": ai_engine.model,
+            "active_engine": db["active_engine"],
+            "selected_model": db["selected_model"]
+        })
+    return jsonify({"error": "Motor invalido"}), 400
 
 @app.route('/api/shutdown', methods=['POST'])
 def shutdown():
@@ -455,7 +538,7 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
         return {"status": "paused", "message": "O ciclo autônomo está pausado pelo usuário."}
 
     # Bloqueio leve não-bloqueante para evitar conflitos concorrentes
-    if not cycle_lock.acquire(blocking=False):
+    if not cycle_lock.acquire(blocking=True if is_manual else False, timeout=25 if is_manual else -1):
         return {"status": "busy", "message": "Ciclo de estudo já em andamento..."}
 
     try:
@@ -522,7 +605,7 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
         
         # Seleciona de 2 a 3 colegas para debaterem ativamente a pauta
         available_commenters = [a for a in agents if a["id"] != author["id"]]
-        num_commenters = min(len(available_commenters), 3)
+        num_commenters = 1 if ai_engine.active_engine == "ollama" else min(len(available_commenters), 3)
         commenting_agents = random.sample(available_commenters, num_commenters)
         comments = []
         for c_agent in commenting_agents:
@@ -586,7 +669,10 @@ def background_generation_loop():
     import time
     time.sleep(6)  # Aguarda servidor iniciar
     while True:
-        time.sleep(60)  # Interação contínua autônoma equilibrada e anti-duplicação
+        # Quando rodando em Ollama Local, dar intervalo de 120s para respiro de CPU/GPU
+        # Quando em Gemini nuvem, 60s
+        loop_interval = 180 if ai_engine.active_engine == "ollama" else 60
+        time.sleep(loop_interval)  # Interação contínua autônoma equilibrada e anti-duplicação
         try:
             db = load_db()
             if not db.get("is_paused", False):
