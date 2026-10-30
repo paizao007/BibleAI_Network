@@ -181,11 +181,14 @@ class OllamaBibleAgentEngine:
 
         raise RuntimeError(f"Gemini API error: {last_err}")
 
-    def _chat_via_ollama(self, messages: List[Dict[str, str]], format: Optional[str] = None, timeout: int = 240, max_tokens: int = 1000) -> Dict[str, Any]:
+    def _chat_via_ollama(self, messages: List[Dict[str, str]], format: Optional[str] = None, timeout: int = 400, max_tokens: Optional[int] = None) -> Dict[str, Any]:
         url = f"{self.host}/api/chat"
-        # Candidatos instalados na maquina do usuario (priorizando gemma3:4b erudito, com qwen2.5:3b e llama3.2:1b)
+        # Candidatos confiaveis instalados na maquina do usuario
         models_to_try = [self.local_model, "gemma3:4b", "qwen2.5:3b"]
         models_to_try = list(dict.fromkeys([m for m in models_to_try if m]))
+
+        # num_predict: -1 indica ao Ollama geracao 100% livre/ilimitada ate o término natural do raciocinio
+        predict_tokens = max_tokens if (max_tokens is not None and max_tokens > 0) else -1
 
         last_err = None
         for m_name in models_to_try:
@@ -197,11 +200,12 @@ class OllamaBibleAgentEngine:
                     "stream": False,
                     "options": {
                         "num_gpu": 0,
-                        "num_predict": max_tokens,
+                        "num_predict": predict_tokens,
                         "temperature": 0.7
                     }
                 }
-                print(f"[🦙 Ollama Local] Processando via '{m_name}' (CPU Estavel, max_tokens={max_tokens}, timeout={timeout}s)...")
+                token_desc = "ILIMITADOS / LIVRES" if predict_tokens == -1 else f"{predict_tokens} tokens"
+                print(f"[🦙 Ollama Local] Processando via '{m_name}' (CPU Estável, tokens={token_desc}, timeout={timeout}s)...")
                 r = requests.post(url, json=payload, timeout=timeout)
                 if r.status_code == 200:
                     res = r.json()
@@ -218,7 +222,7 @@ class OllamaBibleAgentEngine:
 
         raise RuntimeError(f"Ollama local indisponivel apos tentar modelos: {last_err}")
 
-    def chat(self, messages: List[Dict[str, str]], format: Optional[str] = None, max_tokens: int = 800) -> Dict[str, Any]:
+    def chat(self, messages: List[Dict[str, str]], format: Optional[str] = None, max_tokens: Optional[int] = None) -> Dict[str, Any]:
         if self.active_engine == "ollama":
             # 🛡️ Quando configurado como Ollama, NUNCA muda ou chama Gemini!
             return self._chat_via_ollama(messages, format=format, max_tokens=max_tokens)
@@ -302,7 +306,7 @@ FORMATO DE SAÍDA EXIGIDO (JSON puro):
         ]
         
         try:
-            res = self.chat(messages, format="json", max_tokens=1800)
+            res = self.chat(messages, format="json", max_tokens=-1)
             raw_text = res["content"].strip()
             data = extract_json_from_text(raw_text)
             if data and data.get("content") and len(data["content"]) > 100:
@@ -366,7 +370,7 @@ Trecho do estudo analisado:
             {"role": "user", "content": f"Escreva seu comentário fundamentado debatendo a pauta '{topic or post_title}' com @{author_name}."}
         ]
         try:
-            res = self.chat(messages, max_tokens=800)
+            res = self.chat(messages, max_tokens=-1)
             comment = res["content"].strip()
             comment = re.sub(r'<think>.*?</think>', '', comment, flags=re.DOTALL).strip()
             if len(comment) > 40:

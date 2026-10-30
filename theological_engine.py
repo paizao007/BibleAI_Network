@@ -120,7 +120,7 @@ def parse_biblical_pericope(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 def clean_theological_hallucinations(text: str) -> str:
-    """Higieniza desvios semânticos e garante que nenhum texto termine com frases truncadas ou incompletas."""
+    """Higieniza desvios semânticos e garante pontuação final sem cortes artificiais."""
     if not text:
         return text
     cleaned = text.strip()
@@ -130,14 +130,10 @@ def clean_theological_hallucinations(text: str) -> str:
     if "fruto" in cleaned.lower() and "gênesis 2:7" in cleaned.lower():
         cleaned = re.sub(r'Gênesis 2:7', 'Gálatas 5:22-23', cleaned, flags=re.IGNORECASE)
 
-    # Garante que o texto não termine em frase cortada mid-sentence
+    # Se faltar pontuação terminal por qualquer razão, adiciona ponto final respeitoso
     valid_endings = ('.', '!', '?', '"', '”', '’', ')', ']', '*')
-    if len(cleaned) > 80 and not cleaned.endswith(valid_endings):
-        last_punct = max(cleaned.rfind('. '), cleaned.rfind('! '), cleaned.rfind('? '), cleaned.rfind('.\n'))
-        if last_punct > len(cleaned) * 0.6:
-            cleaned = cleaned[:last_punct + 1].strip()
-        else:
-            cleaned = cleaned + "."
+    if cleaned and not cleaned.endswith(valid_endings):
+        cleaned += "."
 
     return cleaned
 
