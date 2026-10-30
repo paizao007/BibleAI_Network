@@ -14,6 +14,47 @@ import random
 from typing import Dict, Any, List
 
 THEOLOGICAL_TOPICS_DATABASE = {
+    "fruto_do_espirito": {
+        "keywords": [
+            "fruto do espírito", "fruto do espirito", "fruto do espirito e a santificação", 
+            "fruto do espírito e a santificação", "santificação", "santificacao", 
+            "gálatas 5", "galatas 5", "gálatas 5:22", "galatas 5:22", 
+            "obras da carne", "andar no espírito", "andar no espirito"
+        ],
+        "verse_ref": "Gálatas 5:22-23",
+        "verse_text": "Mas o fruto do Espírito é: amor, gozo, paz, longanimidade, benignidade, bondade, fidelidade, mansidão, domínio próprio. Contra estas coisas não há lei.",
+        "era": "Século I d.C. (c. 49-55 d.C. - Período Apostólico / Epístola aos Gálatas)",
+        "historical_context": (
+            "1. **A Crise dos Gálatas e a Carta da Liberdade Cristã (Século I d.C.):**\n"
+            "   O apóstolo Paulo redige a epístola às igrejas da Galácia para combater a infiltração dos judaizantes legalistas, que insistiam na imposição da circuncisão e da Lei Mosaica como requisito para a justificação. Paulo desmonta o legalismo provando que a salvação é unicamente pela graça mediante a fé, e que a verdadeira liberdade cristã não conduz à licenciosidade da carne, mas ao discipulado sob o poder regenerador do Espírito Santo.\n\n"
+            "2. **Evidências Papirológicas e Manuscritos Antigos:**\n"
+            "   A perícope de Gálatas 5:22-23 é preservada com fidelidade impressionante nos manuscritos mais antigos do Novo Testamento, notadamente no Papiro 46 (P46, c. 200 d.C., na Coleção Chester Beatty) e nos grandes unciais do século IV — o Codex Sinaiticus e o Codex Vaticanus —, atestando a integridade irrevogável da revelação apostólica sobre o fruto da graça."
+        ),
+        "typological_context": (
+            "1. **Da Lei Escrita em Tábuas de Pedra ao Espírito Escrito no Coração:**\n"
+            "   O fruto do Espírito é o cumprimento vivo da profecia da Nova Aliança de Jeremias 31:33 e Ezequiel 36:26-27: 'Porei dentro de vós o meu Espírito e farei que andeis nos meus estatutos'. A Lei exigia justiça do homem pecador de fora para dentro, mas o Espírito Santo produz a justiça divina de dentro para fora, gerando uma nova natureza em Cristo Jesus.\n\n"
+            "2. **O Fruto Singular (*karpos*) em Contraste com as Obras Plurais (*erga*):**\n"
+            "   Paulo contrasta intencionalmente as 'obras da carne' (no plural, refletindo a divisão caótica, egoísta e fragmentada do pecado) com o 'fruto do Espírito' (no singular grego *karpos*). O fruto é um único cacho divino indissolúvel cuja seiva é o amor (*agapē*), desdobrando-se harmonicamente em todas as virtudes de Cristo na vida do crente."
+        ),
+        "application_context": (
+            "1. **Santificação Real vs. Moralismo Religioso:**\n"
+            "   O fruto não é produzido por esforço próprio farisaico, mas pelo permanecer na Videira Verdadeira (João 15:5). Santificação não é cumprir rituais vazios, mas a ação viva do Espírito que mortifica as inclinações da carne e conforma o caráter do crente à imagem de Jesus.\n\n"
+            "2. **Adoração em Espírito e em Verdade no Cotidiano:**\n"
+            "   A maior evidência da adoração autêntica perante o Trono da Graça não são palavras eloquentes, mas a manifestação do fruto santo no lar, na igreja e na sociedade, honrando a Deus em pureza, paz e mansidão."
+        ),
+        "greek_terms": [
+            ("καρπός", "karpos", "Strong G2590", "https://biblehub.com/greek/2590.htm", "Fruto (substantivo singular coletivo). Revela a unidade orgânica indissolúvel das virtudes cristãs, geradas pela seiva viva do Espírito."),
+            ("ἀγάπη", "agapē", "Strong G26", "https://biblehub.com/greek/26.htm", "Amor sacrificial, incondicional e voluntário de Deus, raiz primordial de onde brotam todos os demais aspectos do fruto."),
+            ("μακροθυμία", "makrothumia", "Strong G3115", "https://biblehub.com/greek/3115.htm", "Longanimidade e paciência heroica perante afrontas e sofrimentos, sem revide ou vingança."),
+            ("χρηστότης", "chrēstotēs", "Strong G5544", "https://biblehub.com/greek/5544.htm", "Benignidade, doçura de espírito e disposição generosa de acolher e fazer o bem ao próximo."),
+            ("ἐγκράτεια", "enkrateia", "Strong G1466", "https://biblehub.com/greek/1466.htm", "Domínio próprio, autodomínio santo e governo das paixões sob a autoridade soberana do Espírito.")
+        ],
+        "hebrew_parallels": [
+            ("פְּרִי", "peri", "Strong H6529", "https://biblehub.com/hebrew/6529.htm", "Fruto e produção vital. Como a árvore plantada junto a correntes de águas que dá o seu fruto na estação própria (Salmo 1:3)."),
+            ("קָדַשׁ", "qadash", "Strong H6942", "https://biblehub.com/hebrew/6942.htm", "Santificar, consagrar e separar exclusivamente para Yahweh, refletindo Sua pureza impecável."),
+            ("עֲנָוָה", "anavah", "Strong H6038", "https://biblehub.com/hebrew/6038.htm", "Mansidão santa e humildade profunda perante o Senhor e o próximo.")
+        ]
+    },
     "ezequiel_25_17": {
         "keywords": ["ezequiel 25:17", "ezequiel 25", "ezequiel", "vingança", "vinganças", "furiosos castigos"],
         "verse_ref": "Ezequiel 25:17",
@@ -333,6 +374,9 @@ THEOLOGICAL_TOPICS_DATABASE = {
 
 def identify_theological_context(topic: str) -> Dict[str, Any]:
     t_low = (topic or "").lower().strip()
+
+    if any(w in t_low for w in ["fruto", "espirito", "espírito", "santific", "galatas", "gálatas"]):
+        return THEOLOGICAL_TOPICS_DATABASE["fruto_do_espirito"]
 
     # 1. Busca exata ou por palavra-chave na base especializada
     for key, data in THEOLOGICAL_TOPICS_DATABASE.items():

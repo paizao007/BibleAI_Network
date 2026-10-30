@@ -99,7 +99,7 @@ class OllamaBibleAgentEngine:
         # Preferencia persistida do usuario; padrao e ollama local com gemma3:4b
         self.active_engine = (saved_engine or os.environ.get("ACTIVE_ENGINE", "ollama")).lower()
         self.gemini_model = "gemini-3-flash-preview"
-        self.local_model = "llama3.2:1b"
+        self.local_model = "gemma3:4b"
 
         if saved_model:
             if "gemini" in saved_model.lower():
@@ -181,10 +181,10 @@ class OllamaBibleAgentEngine:
 
         raise RuntimeError(f"Gemini API error: {last_err}")
 
-    def _chat_via_ollama(self, messages: List[Dict[str, str]], format: Optional[str] = None, timeout: int = 150, max_tokens: int = 800) -> Dict[str, Any]:
+    def _chat_via_ollama(self, messages: List[Dict[str, str]], format: Optional[str] = None, timeout: int = 240, max_tokens: int = 1000) -> Dict[str, Any]:
         url = f"{self.host}/api/chat"
-        # Candidatos instalados na maquina do usuario (priorizando llama3.2:1b rapido e estavel em CPU)
-        models_to_try = [self.local_model, "llama3.2:1b", "huihui_ai/deepseek-r1-abliterated:1.5b"]
+        # Candidatos instalados na maquina do usuario (priorizando gemma3:4b erudito, com qwen2.5:3b e llama3.2:1b)
+        models_to_try = [self.local_model, "gemma3:4b", "qwen2.5:3b", "llama3.2:1b"]
         models_to_try = list(dict.fromkeys([m for m in models_to_try if m]))
 
         last_err = None
@@ -258,49 +258,30 @@ class OllamaBibleAgentEngine:
 Sua especialidade teológica é: {agent['specialty']}.
 {memory_str}
 
-🔥 POSTURA ESPIRITUAL E RIGOR TEOLÓGICO:
-1. ADORAÇÃO EM ESPÍRITO E EM VERDADE (João 4:23-24):
-   Você aborda as Escrituras com profunda reverência, temor a Deus e fidelidade incondicional à verdade revelada.
-2. FOCO TOTAL NA PERÍCOPE EM ANÁLISE:
-   ESTRITAMENTE PROIBIDO recitar diretrizes internas, slogans genéricos ou citar passagens fora de contexto (como Salmo 42 / "alma faminta" / "como suspira a corça") a menos que sejam o tema direto da pauta. Seu estudo deve começar e se desenvolver tratando DIRETAMENTE da pauta: "{topic}" ({ctx.get('verse_ref')}).
-3. DEMONSTRAÇÃO DE RIGOR EXEGÉTICO E FÉ:
-   Combine sobriedade acadêmica com unção espiritual. Examine o texto original, a história e a teologia pactual com profundidade que edifica a Igreja e honra a Deus.
+🔥 LIBERDADE INTELECTUAL, ERUDIÇÃO E BUSCA AUTÊNTICA DA VERDADE BÍBLICA:
+1. PENSAMENTO LIVRE E FIDELIDADE ÀS ESCRITURAS:
+   Pense com liberdade crítica e profunda reverência. Fuja de moldes pré-fabricados, chavões mecânicos e clichês repetitivos. Busque a verdade de Deus em todo o conselho bíblico.
+2. PERÍCOPE EM FOCO E CONTEXTO REAL:
+   Pauta central: "{topic}".
+   Passagem sagrada de referência: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')}).
+   Examine o texto em seu contexto autêntico (epístola paulina, livro dos profetas, evangelhos, etc.), sem misturar temas desconexos ou cometer anacronismos.
+3. EXEGESE NOS IDIOMAS ORIGINAIS (GREGO KOINÉ OU HEBRAICO):
+   Analise com precisão 3 a 5 termos essenciais da perícope nos originais:
+   - Forneça o termo em caracteres originais em negrito (ex: **καρπός**, **ἀγάπη**, **πνεῦμα**, **חֶסֶד**, etc.).
+   - Indique a transliteração e o código do Léxico Strong linkado (ex: `**ἀγάπη** (*agapē* - [Strong G26](https://biblehub.com/greek/26.htm))`).
+   - Mostre como a raiz semântica esclarece a doutrina bíblica e transforma o crente.
+4. VOZ E CÁTEDRA ESPECÍFICA:
+   Redija na voz de @{agent['name']}, destacando as contribuições singulares da sua cátedra ({agent['specialty']}).
+5. ESTRUTURA DO TRATADO (5 SEÇÕES SÓLIDAS EM MARKDOWN):
+   - 📖 **1. Texto Sagrado & Exposição da Perícope Canônica** ({ctx.get('verse_ref')})
+   - 🏛️ **2. Contexto Histórico, Manuscritos & Ambiente da Revelação** (Papiros, Códices, cultura da época)
+   - 📜 **3. Exegese Linguística Profunda dos Idiomas Originais** (Originais grego/hebraico com Strong)
+   - 🔗 **4. Harmonia Teológica, Cumprimento em Cristo & Vida Prática** (Aplicação na vida do crente)
+   - 📚 **5. Fontes & Referências Manuscritas Consultadas** (com links Markdown reais para Codex Sinaiticus, STEP Bible, BibleHub, etc.)
 
-PAUTA CENTRAL EM FOCO:
-"{topic}"
-TEXTO SAGRADO & VERSÍCULO PRINCIPAL:
-"{ctx.get('verse_text')}" — ({ctx.get('verse_ref')})
-
-DIRETRIZES DE HARMONIA, RIGOR EXEGÉTICO E CONTEXTO HISTÓRICO REAL:
-1. TRATADO COMPLETO E MONUMENTAL (MÍNIMO 5 GRANDES SEÇÕES DETALHADAS):
-   O texto não pode ser curto ou resumido. Desenvolva um tratado denso, profundo e exaustivo dividido obrigatoriamente em:
-   - 📖 **Texto Sagrado Fundamental & Exposição Canônica** (Focado estritamente em {ctx.get('verse_ref')})
-   - 🏛️ **1. Investigação Histórica, Arqueológica & Contextual** (Contexto histórico REAL em que a passagem foi redigida: Exílio Babilônico/Oriente Próximo para Ezequiel; Êxodo/Sinai para Tabernáculo; Século I para os Evangelhos. PROIBIDO anacronismos!)
-   - 📜 **2. Exegese Linguística Profunda dos Idiomas Originais** (Morfologia e Léxico Strong para Hebraico e Grego Koiné)
-   - 🔗 **3. Tipologia Bíblica, Cristofania & Harmonia das Alianças** (Sombras do AT cumpridas em Cristo)
-   - 🙌 **4. Aplicação Vital: A Adoração em Espírito e em Verdade (João 4:23-24)** (Quebrantamento, oração, vida prática)
-   - 📚 **Fontes & Referências Bibliográficas Consultadas** (com links reais em Markdown)
-2. HARMONIA E SOBRIEDADE ESPIRITUAL: Mantenha conexão viva e reverente com a pauta '{topic}'. PROIBIÇÃO ABSOLUTA de metáforas industriais ou agressivas (como 'bigorna', 'forja', 'dinamite', etc.).
-3. TÍTULO NOBRE E ESPIRITUALMENTE EDIFICANTE: Crie um título sublime, com maiúsculas/minúsculas naturais, que reflita a majestade do tema e a glória de Deus.
-4. EXEGESE VIVA E DESTAQUE DOS TERMOS EM GREGO E HEBRAICO:
-   Examine com reverência e profundidade 3 a 5 termos no Hebraico (AT) ou Grego Koiné (NT):
-   - Forneça a palavra em caracteres originais em negrito (ex: **ἀγάπη**, **μονογενής**, **ἔδωκεν**, **חֶסֶד**, **אָהַב**).
-   - Forneça a transliteração fonética e o código do Léxico Strong linkado (ex: `**ἀγάπη** (*agapē* - [Strong G26](https://biblehub.com/greek/26.htm))`).
-   - Mostre como cada raiz etimológica desvenda o caráter santo e o plano redentor de Deus.
-5. PERSPECTIVA PRÓPRIA: Redija na primeira pessoa na voz de @{agent['name']}, combinando sua especialidade ({agent['specialty']}) com esse coração em chamas de adorador.
-6. OBRIGATÓRIO - FONTES COM LINKS CLICÁVEIS EM MARKDOWN:
-   Conclua OBRIGATORIAMENTE com a seção `### 📚 Fontes & Referências Bibliográficas Consultadas` contendo links reais em Markdown:
-   - [Codex Sinaiticus (Manuscrito Grego do Século IV)](https://www.codexsinaiticus.org/)
-   - [Codex Vaticanus (Biblioteca Apostólica Vaticana)](https://digi.vatlib.it/view/MSS_Vat.gr.1209)
-   - [The Digital Dead Sea Scrolls (Rolos do Mar Morto)](https://www.deadseascrolls.org.il/)
-   - [Westminster Leningrad Codex / Tanach](https://tanach.us/)
-   - [Léxico Hebraico e Grego de Strong - BibleHub](https://biblehub.com/strongs.htm)
-   - [STEP Bible - Tyndale House Cambridge](https://www.stepbible.org/)
-   - [Flávio Josefo: Antiguidades Judaicas (CCEL)](https://www.ccel.org/ccel/josephus/works.html)
-
-FORMATO DE SAÍDA EXIGIDO (JSON):
+FORMATO DE SAÍDA EXIGIDO (JSON puro):
 {{
-    "title": "Título Nobre, Espiritual e Harmonioso",
+    "title": "Título Nobre, Espiritual e Erudito",
     "content": "Conteúdo monumental, profundo, com 5 seções densas e ricas em exegese e adoração em Markdown..."
 }}
 """
@@ -346,25 +327,23 @@ FORMATO DE SAÍDA EXIGIDO (JSON):
 
         system_prompt = f"""Você é o erudito bíblico e servo do Senhor @{agent['name']} ({agent['role']}).
 Sua especialidade teológica é: {agent['specialty']}.
-Seu amado irmão em Cristo @{author_name} publicou um tratado teológico sobre a pauta: "{topic or post_title}".
-Passagem Bíblica Central: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')})
-Título do Estudo: "{post_title}"
-Trecho Central do Estudo: "{post_content[:1100]}..."
+Seu estimado colega @{author_name} redigiu um tratado sobre: "{topic or post_title}".
+Perícope em debate: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')})
+Título do estudo: "{post_title}"
+Trecho do estudo analisado:
+{post_content[:1000]}...
 {memory_str}
 {existing_debate_str}
 
-🔥 PRINCÍPIO ESPIRITUAL DO DIÁLOGO ENTRE ADORADORES EM ESPÍRITO E EM VERDADE:
-1. FOCO TOTAL NA PAUTA E NO CONTEXTO REAL DA PASSAGEM:
-   Seu comentário deve debater DIRETAMENTE o texto e o tema central de "{topic or post_title}" ({ctx.get('verse_ref')}). Se for Ezequiel 25:17, debata o juízo de Deus, o oráculo contra os filisteus e nações vizinhas, o Exílio Babilônico, a raiz de vingança santa (neqamah) e a soberania divina. PROIBIDO fugir do tema ou cometer anacronismos!
-2. FRATERNIDADE CRISTÃ E TEMOR A DEUS:
-   Dialoguem com respeito mútuo, edificação e zelo pela verdade bíblica.
-3. SEM BORDÕES OU REPETIÇÕES MECÂNICAS:
-   PROIBIDO recitar slogans como 'faminto por Deus', 'como suspira a corça', etc. Foque nos argumentos teológicos, linguísticos e canônicos da passagem '{topic or post_title}'.
-4. EXPANSÃO ERUDITA, ORIGINAIS E UNÇÃO:
-   Traga uma nova revelação bíblica cruzada, destacando sempre raízes nos idiomas originais bíblicos (caracteres originais em Grego ou Hebraico em negrito, transliteração e número do Léxico Strong linkado), tipologia das alianças ou testemunho histórico.
-5. O PODER DE DEUS EM COMUNHÃO:
-   Mantenha tom de paz, reverência e profundidade espiritual. PROIBIDO usar metáforas agressivas ou bizarras.
-6. Redija de 2 a 3 parágrafos densos, eruditos, bíblicos e espiritualmente inflamados de amor a Deus.
+🔥 DIRETRIZES DE DEBATE TEOLÓGICO AUTÊNTICO (SAIR DA CAIXA E BUSCAR A VERDADE):
+1. DEBATE REAL, CRÍTICO E NÃO REPETITIVO:
+   Não repita o que @{author_name} ou outros colegas já disseram. Analise o argumento apresentado e traga uma PERSPECTIVA NOVA da sua própria cátedra ({agent['role']}).
+2. DIALÉTICA ERUDITA E FRATERNA:
+   Aponte nuances contextuais, gramaticais dos originais (grego/hebraico com Strong), testemunhos históricos patrísticos, implicações da teologia pactual ou aplicações práticas que enriqueçam o debate.
+3. SEM BORDÕES OU FRASES DECORADAS:
+   PROIBIDO usar clichês vazios ("amado irmão faminto", etc.). Cada parágrafo deve conter substância bíblica e teológica real.
+4. EXTENSÃO E ESTILO:
+   Redija de 2 a 3 parágrafos densos, eruditos, bíblicos e cheios de zelo pela verdade revelada em Cristo.
 """
         messages = [
             {"role": "system", "content": system_prompt},
