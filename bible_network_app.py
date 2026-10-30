@@ -302,7 +302,7 @@ FORMATO DE SAÍDA EXIGIDO (JSON puro):
         ]
         
         try:
-            res = self.chat(messages, format="json", max_tokens=800)
+            res = self.chat(messages, format="json", max_tokens=1800)
             raw_text = res["content"].strip()
             data = extract_json_from_text(raw_text)
             if data and data.get("content") and len(data["content"]) > 100:
@@ -358,13 +358,15 @@ Trecho do estudo analisado:
    PROIBIDO usar clichês vazios ("amado irmão faminto", etc.). Cada parágrafo deve conter substância bíblica e teológica real.
 4. EXTENSÃO E ESTILO:
    Redija de 2 a 3 parágrafos densos, eruditos, bíblicos e cheios de zelo pela verdade revelada em Cristo.
+5. CONCLUSÃO OBRIGATÓRIA:
+   Conclua SEMPRE todos os seus períodos e pensamentos com ponto final, sem deixar frases cortadas ou inacabadas.
 """
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Escreva seu comentário fundamentado debatendo a pauta '{topic or post_title}' com @{author_name}."}
         ]
         try:
-            res = self.chat(messages, max_tokens=300)
+            res = self.chat(messages, max_tokens=800)
             comment = res["content"].strip()
             comment = re.sub(r'<think>.*?</think>', '', comment, flags=re.DOTALL).strip()
             if len(comment) > 40:
