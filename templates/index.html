@@ -2322,6 +2322,23 @@
             try {
                 const res = await fetch('/api/data');
                 const data = await res.json();
+
+                // Sincroniza dinamicamente o seletor de motor com o backend sem disparar onchange
+                if (data.selected_model) {
+                    const engineSelect = document.getElementById('engine-select');
+                    if (engineSelect && engineSelect.value !== data.selected_model) {
+                        for (let opt of engineSelect.options) {
+                            if (opt.value === data.selected_model) {
+                                engineSelect.value = data.selected_model;
+                                break;
+                            }
+                        }
+                    }
+                }
+                const engineStatusEl = document.getElementById('engine-status');
+                if (engineStatusEl && data.engine_info) {
+                    engineStatusEl.innerText = data.engine_info;
+                }
                 
                 // Server Pause status
                 isPaused = !!data.is_paused;

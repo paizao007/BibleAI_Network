@@ -184,7 +184,7 @@ class OllamaBibleAgentEngine:
     def _chat_via_ollama(self, messages: List[Dict[str, str]], format: Optional[str] = None, timeout: int = 240, max_tokens: int = 1000) -> Dict[str, Any]:
         url = f"{self.host}/api/chat"
         # Candidatos instalados na maquina do usuario (priorizando gemma3:4b erudito, com qwen2.5:3b e llama3.2:1b)
-        models_to_try = [self.local_model, "gemma3:4b", "qwen2.5:3b", "llama3.2:1b"]
+        models_to_try = [self.local_model, "gemma3:4b", "qwen2.5:3b"]
         models_to_try = list(dict.fromkeys([m for m in models_to_try if m]))
 
         last_err = None
@@ -253,6 +253,20 @@ class OllamaBibleAgentEngine:
                     memory_str += f"- @{dp['agent_name']} abordou: '{dp['title']}' com foco em: {dp['content'][:250]}...\n"
 
         ctx = identify_theological_context(topic)
+        is_open = ctx.get("is_open_context", False)
+
+        if is_open:
+            pericope_directive = f"""2. PERÍCOPE EM FOCO E CONTEXTO REAL:
+   Pauta central: "{topic}".
+   INSTRUÇÃO DE BUSCA DA VERDADE CANÔNICA: A pauta é aberta. Identifique no cânon bíblico a perícope central autêntica e os textos sagrados que tratam de "{topic}".
+   Examine o texto em seu ambiente autêntico no Antigo Testamento (Hebraico) ou Novo Testamento (Grego), sem citar versículos fora de contexto e sem inventar livros ou capítulos."""
+            section_1_title = f"1. Texto Sagrado & Exposição Canônica sobre '{topic}'"
+        else:
+            pericope_directive = f"""2. PERÍCOPE EM FOCO E CONTEXTO REAL:
+   Pauta central: "{topic}".
+   Passagem sagrada de referência: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')}).
+   Examine o texto em seu contexto histórico e literário autêntico ({ctx.get('era')}), sem misturar temas desconexos ou cometer anacronismos."""
+            section_1_title = f"1. Texto Sagrado & Exposição Canônica ({ctx.get('verse_ref')})"
 
         system_prompt = f"""Você é o erudito bíblico e servo de Deus @{agent['name']} ({agent['role']}).
 Sua especialidade teológica é: {agent['specialty']}.
@@ -261,10 +275,7 @@ Sua especialidade teológica é: {agent['specialty']}.
 🔥 LIBERDADE INTELECTUAL, ERUDIÇÃO E BUSCA AUTÊNTICA DA VERDADE BÍBLICA:
 1. PENSAMENTO LIVRE E FIDELIDADE ÀS ESCRITURAS:
    Pense com liberdade crítica e profunda reverência. Fuja de moldes pré-fabricados, chavões mecânicos e clichês repetitivos. Busque a verdade de Deus em todo o conselho bíblico.
-2. PERÍCOPE EM FOCO E CONTEXTO REAL:
-   Pauta central: "{topic}".
-   Passagem sagrada de referência: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')}).
-   Examine o texto em seu contexto autêntico (epístola paulina, livro dos profetas, evangelhos, etc.), sem misturar temas desconexos ou cometer anacronismos.
+{pericope_directive}
 3. EXEGESE NOS IDIOMAS ORIGINAIS (GREGO KOINÉ OU HEBRAICO):
    Analise com precisão 3 a 5 termos essenciais da perícope nos originais:
    - Forneça o termo em caracteres originais em negrito (ex: **καρπός**, **ἀγάπη**, **πνεῦμα**, **חֶסֶד**, etc.).
@@ -273,7 +284,7 @@ Sua especialidade teológica é: {agent['specialty']}.
 4. VOZ E CÁTEDRA ESPECÍFICA:
    Redija na voz de @{agent['name']}, destacando as contribuições singulares da sua cátedra ({agent['specialty']}).
 5. ESTRUTURA DO TRATADO (5 SEÇÕES SÓLIDAS EM MARKDOWN):
-   - 📖 **1. Texto Sagrado & Exposição da Perícope Canônica** ({ctx.get('verse_ref')})
+   - 📖 **{section_1_title}**
    - 🏛️ **2. Contexto Histórico, Manuscritos & Ambiente da Revelação** (Papiros, Códices, cultura da época)
    - 📜 **3. Exegese Linguística Profunda dos Idiomas Originais** (Originais grego/hebraico com Strong)
    - 🔗 **4. Harmonia Teológica, Cumprimento em Cristo & Vida Prática** (Aplicação na vida do crente)
@@ -295,6 +306,9 @@ FORMATO DE SAÍDA EXIGIDO (JSON puro):
             raw_text = res["content"].strip()
             data = extract_json_from_text(raw_text)
             if data and data.get("content") and len(data["content"]) > 100:
+                data["content"] = clean_theological_hallucinations(data["content"])
+                if data.get("title"):
+                    data["title"] = clean_theological_hallucinations(data["title"])
                 print(f"[✨ IA REAL - {res.get('model_used')}] Estudo autêntico e inédito gerado para @{agent['name']} sobre '{topic}'!")
                 return data
         except Exception as e:
@@ -354,6 +368,7 @@ Trecho do estudo analisado:
             comment = res["content"].strip()
             comment = re.sub(r'<think>.*?</think>', '', comment, flags=re.DOTALL).strip()
             if len(comment) > 40:
+                comment = clean_theological_hallucinations(comment)
                 print(f"[✨ IA REAL - {res.get('model_used')}] Comentario autentico de @{agent['name']} sobre '{topic or post_title}'!")
                 return comment
         except Exception as e:
@@ -383,22 +398,35 @@ LEGACY_FIXED_TOPICS = {
     "As 70 Semanas de Daniel e as Profecias Messiânicas"
 }
 
+db_rw_lock = threading.Lock()
+
 def load_db():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            # Remove qualquer tópico fixo legado que possa existir
-            raw_topics = data.get("topics", [])
-            clean_topics = [t for t in raw_topics if t not in LEGACY_FIXED_TOPICS]
-            if len(clean_topics) != len(raw_topics):
-                data["topics"] = clean_topics
-                save_db(data)
-            return data
-    return {"agents": [], "topics": [], "posts": [], "studies": []}
+    with db_rw_lock:
+        if os.path.exists(DB_FILE):
+            for attempt in range(3):
+                try:
+                    with open(DB_FILE, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        raw_topics = data.get("topics", [])
+                        clean_topics = [t for t in raw_topics if t not in LEGACY_FIXED_TOPICS]
+                        if len(clean_topics) != len(raw_topics):
+                            data["topics"] = clean_topics
+                            # Chama escrita atômica interna
+                            tmp_file = DB_FILE + ".tmp"
+                            with open(tmp_file, 'w', encoding='utf-8') as tf:
+                                json.dump(data, tf, indent=4, ensure_ascii=False)
+                            os.replace(tmp_file, DB_FILE)
+                        return data
+                except (json.JSONDecodeError, IOError):
+                    time.sleep(0.05)
+        return {"agents": [], "topics": [], "posts": [], "studies": []}
 
 def save_db(data):
-    with open(DB_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    with db_rw_lock:
+        tmp_file = DB_FILE + ".tmp"
+        with open(tmp_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        os.replace(tmp_file, DB_FILE)
 
 # --- FLASK ROUTES ---
 @app.route('/')

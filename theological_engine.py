@@ -11,7 +11,127 @@ Garante:
 """
 
 import random
-from typing import Dict, Any, List
+import re
+from typing import Dict, Any, List, Optional
+
+# ==============================================================================
+# 📖 REGISTRO CANÔNICO DOS 66 LIVROS DA BÍBLIA & PARSER EXEGÉTICO UNIVERSAL
+# Garante que NUNCA um tema caia em livros errados ou anacronismos
+# ==============================================================================
+
+BIBLE_CANON_REGISTRY = {
+    # Antigo Testamento (39 Livros)
+    "gênesis": {"name": "Gênesis", "abbrev": ["gn", "gen", "genesis"], "testament": "AT", "lang": "Hebraico", "era": "Período Patriarcal / Pentateuco Mosaico (c. 1446-1406 a.C.)"},
+    "êxodo": {"name": "Êxodo", "abbrev": ["ex", "exo", "exodo"], "testament": "AT", "lang": "Hebraico", "era": "Saída do Egito & Aliança do Sinai (c. 1446 a.C.)"},
+    "levítico": {"name": "Levítico", "abbrev": ["lv", "lev", "levitico"], "testament": "AT", "lang": "Hebraico", "era": "Sacerdócio Levítico & Leis de Santidade no Tabernáculo"},
+    "números": {"name": "Números", "abbrev": ["nm", "num", "numeros"], "testament": "AT", "lang": "Hebraico", "era": "Peregrinação no Deserto de Parã (c. 1445-1406 a.C.)"},
+    "deuteronômio": {"name": "Deuteronômio", "abbrev": ["dt", "deut", "deuteronomio"], "testament": "AT", "lang": "Hebraico", "era": "Campinas de Moabe / Renovação da Aliança Mosaica (c. 1406 a.C.)"},
+    "josué": {"name": "Josué", "abbrev": ["js", "jos", "josue"], "testament": "AT", "lang": "Hebraico", "era": "Conquista de Canaã e Repartição das Tribos (c. 1400 a.C.)"},
+    "juízes": {"name": "Juízes", "abbrev": ["jz", "jui", "juizes"], "testament": "AT", "lang": "Hebraico", "era": "Período da Teocracia e dos Juízes de Israel (c. 1380-1050 a.C.)"},
+    "rute": {"name": "Rute", "abbrev": ["rt", "rut", "rute"], "testament": "AT", "lang": "Hebraico", "era": "Época dos Juízes / Belém de Judá e o Parente Remidor"},
+    "1 samuel": {"name": "1 Samuel", "abbrev": ["1sm", "1sam", "1 samuel"], "testament": "AT", "lang": "Hebraico", "era": "Transição Teocrática para a Monarquia de Davi (c. 1050-1010 a.C.)"},
+    "2 samuel": {"name": "2 Samuel", "abbrev": ["2sm", "2sam", "2 samuel"], "testament": "AT", "lang": "Hebraico", "era": "Reinado de Davi em Jerusalém & Aliança Davídica (c. 1010-970 a.C.)"},
+    "1 reis": {"name": "1 Reis", "abbrev": ["1rs", "1reis", "1 reis"], "testament": "AT", "lang": "Hebraico", "era": "Reinado de Salomão, Templo de Jerusalém & Divisão do Reino (c. 970-850 a.C.)"},
+    "2 reis": {"name": "2 Reis", "abbrev": ["2rs", "2reis", "2 reis"], "testament": "AT", "lang": "Hebraico", "era": "Queda de Samaria e Exílio na Babilônia (c. 850-586 a.C.)"},
+    "1 crônicas": {"name": "1 Crônicas", "abbrev": ["1cr", "1cron", "1 cronicas"], "testament": "AT", "lang": "Hebraico", "era": "Genealogias Sagradas & Adoração Davídica no Templo"},
+    "2 crônicas": {"name": "2 Crônicas", "abbrev": ["2cr", "2cron", "2 cronicas"], "testament": "AT", "lang": "Hebraico", "era": "História Espiritual dos Reis de Judá e Glória do Templo"},
+    "esdras": {"name": "Esdras", "abbrev": ["ed", "esd", "esdras"], "testament": "AT", "lang": "Hebraico", "era": "Retorno do Cativeiro Babilônico & Reconstrução do Templo (c. 538-458 a.C.)"},
+    "neemias": {"name": "Neemias", "abbrev": ["ne", "neem", "neemias"], "testament": "AT", "lang": "Hebraico", "era": "Reconstrução dos Muros de Jerusalém & Avivamento da Lei (c. 445 a.C.)"},
+    "ester": {"name": "Ester", "abbrev": ["et", "est", "ester"], "testament": "AT", "lang": "Hebraico", "era": "Império Persa / Providência Soberana em Susã (c. 483-473 a.C.)"},
+    "jó": {"name": "Jó", "abbrev": ["jo", "job", "jó"], "testament": "AT", "lang": "Hebraico", "era": "Terra de Uz / Literatura Sapiencial e a Soberania Divina no Sofrimento"},
+    "salmos": {"name": "Salmos", "abbrev": ["sl", "sal", "salmo", "salmos"], "testament": "AT", "lang": "Hebraico", "era": "Culto e Louvor Teocrático no Templo de Sião (Davi, Asafe, Corá)"},
+    "provérbios": {"name": "Provérbios", "abbrev": ["pv", "prov", "proverbios"], "testament": "AT", "lang": "Hebraico", "era": "Sabedoria Prática e Temor de Yahweh na Monarquia de Salomão"},
+    "eclesiastes": {"name": "Eclesiastes", "abbrev": ["ec", "ecl", "eclesiastes"], "testament": "AT", "lang": "Hebraico", "era": "O Pregador (Qohelet) / Reflexão sobre a Vaidade e o Temor a Deus"},
+    "cantares": {"name": "Cantares", "abbrev": ["ct", "cant", "cantares", "cânticos", "canticos"], "testament": "AT", "lang": "Hebraico", "era": "Poesia Lírica de Amor Conjugal e Tipologia do Amor Divino"},
+    "isaías": {"name": "Isaías", "abbrev": ["is", "isai", "isaias"], "testament": "AT", "lang": "Hebraico", "era": "Profecia Messiânica em Jerusalém / Reino de Judá (c. 740-680 a.C.)"},
+    "jeremias": {"name": "Jeremias", "abbrev": ["jr", "jer", "jeremias"], "testament": "AT", "lang": "Hebraico", "era": "Queda de Jerusalém & Promessa da Nova Aliança (c. 627-580 a.C.)"},
+    "lamentações": {"name": "Lamentações", "abbrev": ["lm", "lam", "lamentacoes"], "testament": "AT", "lang": "Hebraico", "era": "Elegias Fúnebres sobre a Destruição do Primeiro Templo (586 a.C.)"},
+    "ezequiel": {"name": "Ezequiel", "abbrev": ["ez", "eze", "ezequiel"], "testament": "AT", "lang": "Hebraico", "era": "Exílio Babilônico junto ao Rio Quebar (c. 593-571 a.C.)"},
+    "daniel": {"name": "Daniel", "abbrev": ["dn", "dan", "daniel"], "testament": "AT", "lang": "Hebraico", "era": "Corte Real Babilônica e Medo-Persa / Profecias Apocalípticas (c. 605-536 a.C.)"},
+    "oséias": {"name": "Oséias", "abbrev": ["os", "ose", "oseias"], "testament": "AT", "lang": "Hebraico", "era": "Amor Fiel de Deus pelo Povo Infiel / Reino do Norte (c. 750 a.C.)"},
+    "joel": {"name": "Joel", "abbrev": ["jl", "joe", "joel"], "testament": "AT", "lang": "Hebraico", "era": "Praga de Gafanhotos & Derramamento do Espírito no Dia do Senhor"},
+    "amós": {"name": "Amós", "abbrev": ["am", "amo", "amos"], "testament": "AT", "lang": "Hebraico", "era": "Justiça Social e Retidão Moral perante Deus em Israel (c. 760 a.C.)"},
+    "obadias": {"name": "Obadias", "abbrev": ["ob", "oba", "obadias"], "testament": "AT", "lang": "Hebraico", "era": "Oráculo de Juízo contra a Soberba e Violência de Edom"},
+    "jonas": {"name": "Jonas", "abbrev": ["jn", "jon", "jonas"], "testament": "AT", "lang": "Hebraico", "era": "Missão em Nínive e a Soberana Misericórdia de Yahweh aos Gentios"},
+    "miqueias": {"name": "Miqueias", "abbrev": ["mq", "miq", "miqueias"], "testament": "AT", "lang": "Hebraico", "era": "Profecia do Nascimento do Messias em Belém de Efrata (c. 735-700 a.C.)"},
+    "naum": {"name": "Naum", "abbrev": ["na", "nau", "naum"], "testament": "AT", "lang": "Hebraico", "era": "Juízo Irrevogável sobre a Cidade Sanguinária de Nínive (c. 663-612 a.C.)"},
+    "habacuque": {"name": "Habacuque", "abbrev": ["hc", "hab", "habacuque"], "testament": "AT", "lang": "Hebraico", "era": "O Justo Viverá pela sua Fé perante o Mistério Divino (c. 605 a.C.)"},
+    "sofonias": {"name": "Sofonias", "abbrev": ["sf", "sof", "sofonias"], "testament": "AT", "lang": "Hebraico", "era": "O Grande Dia da Ira de Deus & Restauração de um Remanescente Humilde"},
+    "ageu": {"name": "Ageu", "abbrev": ["ag", "age", "ageu"], "testament": "AT", "lang": "Hebraico", "era": "Reconstrução do Segundo Templo no Pós-Exílio Babilônico (520 a.C.)"},
+    "zacarias": {"name": "Zacarias", "abbrev": ["zc", "zac", "zacarias"], "testament": "AT", "lang": "Hebraico", "era": "Visões Escatológicas e o Rei Humilde que Entra em Sião (c. 520-480 a.C.)"},
+    "malaquias": {"name": "Malaquias", "abbrev": ["ml", "mal", "malaquias"], "testament": "AT", "lang": "Hebraico", "era": "Último Oráculo Profético / O Sol da Justiça que Nasce (c. 430 a.C.)"},
+    # Novo Testamento (27 Livros)
+    "mateus": {"name": "Mateus", "abbrev": ["mt", "mat", "mateus"], "testament": "NT", "lang": "Grego", "era": "Evangelho Messiânico para a Comunidade Judaica (Séc. I d.C.)"},
+    "marcos": {"name": "Marcos", "abbrev": ["mc", "mar", "marcos"], "testament": "NT", "lang": "Grego", "era": "Evangelho do Servo Sofredor e Filho de Deus em Ação (c. 55-65 d.C.)"},
+    "lucas": {"name": "Lucas", "abbrev": ["lc", "luc", "lucas"], "testament": "NT", "lang": "Grego", "era": "Evangelho Histórico / O Salvador de Todas as Nações e Humildes (c. 60 d.C.)"},
+    "joão": {"name": "João", "abbrev": ["jo", "joa", "joao"], "testament": "NT", "lang": "Grego", "era": "Evangelho Espiritual / O Logos Divino Encarnado (c. 85-95 d.C.)"},
+    "atos": {"name": "Atos", "abbrev": ["at", "act", "atos"], "testament": "NT", "lang": "Grego", "era": "Pentecostes e a Expansão do Evangelho no Império Romano (c. 30-62 d.C.)"},
+    "romanos": {"name": "Romanos", "abbrev": ["rm", "rom", "romanos"], "testament": "NT", "lang": "Grego", "era": "Tratado Monumental da Justificação pela Fé & Graça Soberana (c. 57 d.C.)"},
+    "1 coríntios": {"name": "1 Coríntios", "abbrev": ["1co", "1cor", "1 corintios"], "testament": "NT", "lang": "Grego", "era": "Correção Pastoral em Corinto / Cruz, Ceia e Ressurreição (c. 55 d.C.)"},
+    "2 coríntios": {"name": "2 Coríntios", "abbrev": ["2co", "2cor", "2 corintios"], "testament": "NT", "lang": "Grego", "era": "Defesa do Ministério Apostólico & Tesouro em Vasos de Barro (c. 56 d.C.)"},
+    "gálatas": {"name": "Gálatas", "abbrev": ["gl", "gal", "galatas"], "testament": "NT", "lang": "Grego", "era": "A Magna Carta da Liberdade Cristã contra o Legalismo Judaizante (c. 49-55 d.C.)"},
+    "efésios": {"name": "Efésios", "abbrev": ["ef", "efe", "efesios"], "testament": "NT", "lang": "Grego", "era": "O Mistério da Igreja, Unidade em Cristo & Armadura de Deus (c. 60-62 d.C.)"},
+    "filipenses": {"name": "Filipenses", "abbrev": ["fp", "fil", "filipenses"], "testament": "NT", "lang": "Grego", "era": "Alegria no Cárcere / O Esvaziamento (Kenosis) de Cristo (c. 61 d.C.)"},
+    "colossenses": {"name": "Colossenses", "abbrev": ["cl", "col", "colossenses"], "testament": "NT", "lang": "Grego", "era": "A Supremacia Cósmica e Plenitude de Cristo sobre Toda a Criação (c. 60-62 d.C.)"},
+    "1 tessalonicenses": {"name": "1 Tessalonicenses", "abbrev": ["1ts", "1tes", "1 tessalonicenses"], "testament": "NT", "lang": "Grego", "era": "Santificação, Consolação e a Bendita Esperança do Arrebatamento (c. 51 d.C.)"},
+    "2 tessalonicenses": {"name": "2 Tessalonicenses", "abbrev": ["2ts", "2tes", "2 tessalonicenses"], "testament": "NT", "lang": "Grego", "era": "O Dia do Senhor, o Mistério da Iniquidade & Perseverança Cristã (c. 51-52 d.C.)"},
+    "1 timóteo": {"name": "1 Timóteo", "abbrev": ["1tm", "1tim", "1 timoteo"], "testament": "NT", "lang": "Grego", "era": "Sã Doutrina, Liderança Pastoral e Piedade Cristã em Éfeso (c. 63 d.C.)"},
+    "2 timóteo": {"name": "2 Timóteo", "abbrev": ["2tm", "2tim", "2 timoteo"], "testament": "NT", "lang": "Grego", "era": "Testamento Final de Paulo na Prisão Mamertina em Roma (c. 67 d.C.)"},
+    "tito": {"name": "Tito", "abbrev": ["tt", "tit", "tito"], "testament": "NT", "lang": "Grego", "era": "Ordem nas Igrejas de Creta & Boas Obras Decorrentes da Graça (c. 63-65 d.C.)"},
+    "filemom": {"name": "Filemom", "abbrev": ["fm", "flm", "filemom"], "testament": "NT", "lang": "Grego", "era": "Perdão Fraterno, Igualdade em Cristo e o Escravo Onésimo (c. 60-62 d.C.)"},
+    "hebreus": {"name": "Hebreus", "abbrev": ["hb", "heb", "hebreus"], "testament": "NT", "lang": "Grego", "era": "A Superioridade Eterna de Cristo sobre Anjos, Moisés e Sacerdócio (c. 65-69 d.C.)"},
+    "tiago": {"name": "Tiago", "abbrev": ["tg", "tia", "tiago"], "testament": "NT", "lang": "Grego", "era": "A Fé Viva Demonstrada em Obras de Amor e Justiça Prática (c. 45-48 d.C.)"},
+    "1 pedro": {"name": "1 Pedro", "abbrev": ["1pe", "1ped", "1 pedro"], "testament": "NT", "lang": "Grego", "era": "Esperança Viva em Meio ao Sofrimento e Provação sob Nero (c. 64 d.C.)"},
+    "2 pedro": {"name": "2 Pedro", "abbrev": ["2pe", "2ped", "2 pedro"], "testament": "NT", "lang": "Grego", "era": "Crescimento na Graça, Alerta contra Hereges & Novos Céus e Terra (c. 66 d.C.)"},
+    "1 joão": {"name": "1 João", "abbrev": ["1jo", "1joa", "1 joao"], "testament": "NT", "lang": "Grego", "era": "Comunhão com Deus que é Luz e Amor / Certeza da Salvação (c. 90 d.C.)"},
+    "2 joão": {"name": "2 João", "abbrev": ["2jo", "2joa", "2 joao"], "testament": "NT", "lang": "Grego", "era": "Andar na Verdade e Amor / Rejeição aos Enganadores Docetistas (c. 90 d.C.)"},
+    "3 joão": {"name": "3 João", "abbrev": ["3jo", "3joa", "3 joao"], "testament": "NT", "lang": "Grego", "era": "Hospitalidade aos Cooperadores da Verdade / Alerta contra Diótrefes (c. 90 d.C.)"},
+    "judas": {"name": "Judas", "abbrev": ["jd", "jud", "judas"], "testament": "NT", "lang": "Grego", "era": "Batalha Diligente pela Fé que uma vez foi Dada aos Santos (c. 65-80 d.C.)"},
+    "apocalipse": {"name": "Apocalipse", "abbrev": ["ap", "apoc", "apocalipse", "revelação", "revelacao"], "testament": "NT", "lang": "Grego", "era": "Revelação do Cordeiro Triunfante na Ilha de Patmos (c. 95 d.C.)"}
+}
+
+def parse_biblical_pericope(text: str) -> Optional[Dict[str, Any]]:
+    """Detecta qualquer livro bíblico, capítulo e versículo em português e abreviações."""
+    if not text:
+        return None
+    t_clean = text.lower().replace("º", "").replace("°", "")
+    for book_key, info in BIBLE_CANON_REGISTRY.items():
+        patterns = [info["name"].lower()] + info["abbrev"]
+        for p in patterns:
+            m = re.search(r'\b' + re.escape(p) + r'\b\s*(\d+)?(?::(\d+)(?:-(\d+))?)?', t_clean)
+            if m:
+                chap = m.group(1)
+                v_start = m.group(2)
+                v_end = m.group(3)
+                ref_str = info["name"]
+                if chap:
+                    ref_str += f" {chap}"
+                    if v_start:
+                        ref_str += f":{v_start}"
+                        if v_end:
+                            ref_str += f"-{v_end}"
+                return {
+                    "book_info": info,
+                    "reference": ref_str,
+                    "testament": info["testament"],
+                    "lang": info["lang"],
+                    "era": info["era"]
+                }
+    return None
+
+def clean_theological_hallucinations(text: str) -> str:
+    """Higieniza pequenos desvios semânticos comuns em LLMs leves."""
+    if not text:
+        return text
+    cleaned = text
+    cleaned = re.sub(r'\bGalat[eé]us\b', 'Gálatas', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\blivro das Coleções\b', 'Epístolas Paulinas', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\bColeções \(Colossenses, Efésios\)\b', 'Epístolas Paulinas (Colossenses e Efésios)', cleaned, flags=re.IGNORECASE)
+    # Se mencionar Gênesis 2:7 no contexto de fruto do espírito, corrige
+    if "fruto" in cleaned.lower() and "gênesis 2:7" in cleaned.lower():
+        cleaned = re.sub(r'Gênesis 2:7', 'Gálatas 5:22-23', cleaned, flags=re.IGNORECASE)
+    return cleaned
+
 
 THEOLOGICAL_TOPICS_DATABASE = {
     "fruto_do_espirito": {
@@ -369,22 +489,301 @@ THEOLOGICAL_TOPICS_DATABASE = {
             ("יַחְסַר", "yachsar", "Strong H2637", "https://biblehub.com/hebrew/2637.htm", "Faltar, ter carência ou privação. 'Lo echsar' — nada me faltará."),
             ("מְנוּחָה", "menuchah", "Strong H4496", "https://biblehub.com/hebrew/4496.htm", "Águas de descanso e repouso sereno da alma.")
         ]
+    },
+    "armadura_de_deus": {
+        "keywords": ["armadura", "armadura de deus", "guerra espiritual", "panóplia", "panoplia", "efésios 6", "efesios 6", "escudo da fé", "espada do espírito"],
+        "verse_ref": "Efésios 6:10-18",
+        "verse_text": "Revesti-vos de toda a armadura de Deus, para que possais estar firmes contra as astutas ciladas do diabo... tomando sobretudo o escudo da fé... e a espada do Espírito, que é a palavra de Deus.",
+        "era": "Século I d.C. (c. 60-62 d.C. - Epístola Paulina da Prisão / Roma)",
+        "historical_context": (
+            "1. **A Armadura Romana como Metáfora Apostólica:**\n"
+            "   Paulo redige acorrentado a um soldado pretoriano romano, ressignificando a panóplia bélica imperial para descrever o combate espiritual invisível do crente contra as forças das trevas.\n\n"
+            "2. **Evidências Manuscritas:**\n"
+            "   O texto de Efésios 6 é atestado no Papiro 46 (P46, séc. II) e nos códices Sinaiticus e Vaticanus, com a exortação canônica à firmeza inabalável no Senhor."
+        ),
+        "typological_context": (
+            "1. **Yahweh como o Guerreiro Divino no Antigo Testamento:**\n"
+            "   A armadura do cristão é a própria vestimenta messiânica de Isaías 59:17 ('vestiu-se de justiça como de uma couraça e pôs o capacete da salvação na cabeça'), transferida por graça aos servos de Cristo."
+        ),
+        "application_context": (
+            "1. **Vigilância e Oração Contínua (Efésios 6:18):**\n"
+            "   A armadura não funciona sem 'orando em todo o tempo no Espírito'. O combate cristão é travado de joelhos em santidade e verdade."
+        ),
+        "greek_terms": [
+            ("πανοπλία", "panoplia", "Strong G3833", "https://biblehub.com/greek/3833.htm", "Armadura completa e impenetrável provida por Deus."),
+            ("μάχαιρα", "machaira", "Strong G3162", "https://biblehub.com/greek/3162.htm", "Espada curta defensiva e ofensiva / a Palavra rhema viva de Deus."),
+            ("θυρεός", "thyreos", "Strong G2375", "https://biblehub.com/greek/2375.htm", "Grande escudo retangular protetor da fé contra os dardos inflamados.")
+        ]
+    },
+    "sermao_da_montanha": {
+        "keywords": ["sermão da montanha", "sermao da montanha", "sermão do monte", "sermao do monte", "bem-aventurados", "bem aventurados", "bem-aventuranças", "mateus 5", "sal da terra", "luz do mundo"],
+        "verse_ref": "Mateus 5:1-12",
+        "verse_text": "Vendo Jesus as multidões, subiu ao monte, e, assentando-se, aproximaram-se dele os seus discípulos; e, abrindo a boca, os ensinava, dizendo: Bem-aventurados os pobres de espírito, porque deles é o reino dos céus.",
+        "era": "Século I d.C. (c. 28-30 d.C. - Ministério Galilaico de Jesus Cristo)",
+        "historical_context": (
+            "1. **A Nova Lei do Monte das Bem-Aventuranças:**\n"
+            "   Cristo sobe ao monte como o Novo Moisés, não para anular a Lei e os Profetas, mas para levá-los à sua plenitude e perfeição divina interior.\n\n"
+            "2. **A Manuscritologia dos Evangelhos:**\n"
+            "   O Sermão da Montanha encontra-se preservado no Papiro 1 (P1, séc. III) e nos grandes códices bíblicos, constituindo o cerne da ética do Reino de Deus."
+        ),
+        "typological_context": (
+            "1. **Do Sinai à Galiléia:**\n"
+            "   No Sinai a Lei vinha com trovões e condenação ao transgressor; no Monte das Bem-Aventuranças, o Filho de Deus proclama graça soberana, misericórdia e retidão aos quebrantados."
+        ),
+        "application_context": (
+            "1. **Vida Justa e Humildade Espiritual:**\n"
+            "   Ser 'pobre de espírito' (ptōchoi tō pneumati) é reconhecer a total falência humana sem Deus e depender exclusivamente da Sua graça."
+        ),
+        "greek_terms": [
+            ("μακάριος", "makarios", "Strong G3107", "https://biblehub.com/greek/3107.htm", "Bem-aventurado, plenamente feliz e abençoado sob a graça de Deus."),
+            ("βασιλεία", "basileia", "Strong G932", "https://biblehub.com/greek/932.htm", "O Reino soberano e celestial de Deus inaugurado por Jesus."),
+            ("δικαιοσύνη", "dikaiosynē", "Strong G1343", "https://biblehub.com/greek/1343.htm", "Justiça santa e pura que transcende o moralismo exterior dos fariseus.")
+        ]
+    },
+    "filho_prodigo": {
+        "keywords": ["filho pródigo", "filho prodigo", "pai misericordioso", "lucas 15", "dois filhos"],
+        "verse_ref": "Lucas 15:11-32",
+        "verse_text": "E, levantando-se, foi para seu pai; e, quando ainda estava longe, viu-o seu pai, e se moveu de íntima compaixão e, correndo, lançou-se-lhe ao pescoço e o beijou.",
+        "era": "Século I d.C. (Ministério Itinerante de Cristo / Parábolas da Graça e Redenção)",
+        "historical_context": (
+            "1. **A Cultura Patriarcal Semítica do Século I:**\n"
+            "   Pedir a herança antes da morte do pai era o equivalente a desejar-lhe a morte. O gesto escandaloso do pai correr (quebrando a dignidade oriental dos anciãos) ilustra o amor radical de Deus que corre ao encontro do pecador arrependido."
+        ),
+        "typological_context": (
+            "1. **A Celebração do Banquete Messiânico:**\n"
+            "   A melhor túnica (justiça imputada), o anel (restauração da autoridade de filho) e as sandálias (libertação da condição de escravo) tipificam a redenção completa outorgada pelo Pai em Cristo."
+        ),
+        "application_context": (
+            "1. **O Perigo do Legalismo do Filho Mais Velho:**\n"
+            "   A parábola adverte contra a dureza religiosa que se recusa a celebrar a reconciliação do irmão resgatado."
+        ),
+        "greek_terms": [
+            ("σπλαγχνίζομαι", "splanchnizomai", "Strong G4697", "https://biblehub.com/greek/4697.htm", "Íntima e comovente compaixão visceral de Deus pelo penitente."),
+            ("ἀπόλλυμι", "apollymi", "Strong G622", "https://biblehub.com/greek/622.htm", "Aquele que estava perdido e morto e foi achado para a vida."),
+            ("χάρις", "charis", "Strong G5485", "https://biblehub.com/greek/5485.htm", "Graça imerecida e restauração plena da comunhão filial.")
+        ]
+    },
+    "pentecostes": {
+        "keywords": ["pentecostes", "pentecoste", "derramamento do espírito", "batismo no espírito", "atos 2", "línguas de fogo", "linguas de fogo"],
+        "verse_ref": "Atos 2:1-4",
+        "verse_text": "Cumprindo-se o dia de Pentecostes, estavam todos reunidos no mesmo lugar; e de repente veio do céu um som, como de um vento veemente e impetuoso... e todos foram cheios do Espírito Santo.",
+        "era": "Século I d.C. (c. 30 d.C. - Jerusalém / Nascimento Histórico da Igreja Cristã)",
+        "historical_context": (
+            "1. **Da Festa das Primícias (Shavuot) à Igreja Cheia do Espírito:**\n"
+            "   Pentecostes celebrava a colheita do trigo e a outorga da Lei no Sinai. Em Atos 2, Deus colhe as primícias de 3.000 almas e escreve Sua Lei nos corações pelo Espírito Santo."
+        ),
+        "typological_context": (
+            "1. **Reversão Santa da Torre de Babel:**\n"
+            "   Em Babel as línguas foram confundidas para dispersar o orgulho humano; em Pentecostes as línguas unem os povos na proclamação das grandezas de Deus."
+        ),
+        "application_context": (
+            "1. **Poder para Testemunhar:**\n"
+            "   O Espírito Santo capacita a Igreja a pregar o Evangelho com intrepidez santa, pureza e poder miraculoso."
+        ),
+        "greek_terms": [
+            ("πνεῦμα ἅγιον", "pneuma hagion", "Strong G4151 / G40", "https://biblehub.com/greek/4151.htm", "O Espírito Santo prometido pelo Pai derramado sobre toda carne."),
+            ("δύναμις", "dynamis", "Strong G1411", "https://biblehub.com/greek/1411.htm", "Poder espiritual soberano para testemunho intrépido de Jesus."),
+            ("γλῶσσα", "glōssa", "Strong G1100", "https://biblehub.com/greek/1100.htm", "Línguas concedidas pelo Espírito para anunciar as maravilhas divinas.")
+        ]
+    },
+    "ressurreicao_cristo": {
+        "keywords": ["ressurreição", "ressurreicao", "túmulo vazio", "tumulo vazio", "1 coríntios 15", "1 corintios 15", "tragada foi a morte"],
+        "verse_ref": "1 Coríntios 15:20-22, 54-57",
+        "verse_text": "Mas agora Cristo ressuscitou dos mortos, e foi feito as primícias dos que dormem... Tragada foi a morte na vitória. Onde está, ó morte, o teu aguilhão?",
+        "era": "Século I d.C. (c. 55 d.C. - Éfeso / O Credo Primitivo da Ressurreição)",
+        "historical_context": (
+            "1. **A Historicidade da Ressurreição Corporal de Jesus:**\n"
+            "   Paulo cita mais de quinhentas testemunhas oculares vivas da ressurreição, provando que a fé cristã está alicerçada em fatos históricos comprováveis e não em mitos."
+        ),
+        "typological_context": (
+            "1. **O Segundo Adão e a Vitória sobre a Morte:**\n"
+            "   Como em Adão todos morrem, assim em Cristo todos os redimidos serão vivificados para a eternidade."
+        ),
+        "application_context": (
+            "1. **Esperança Viva e Trabalho Firme no Senhor:**\n"
+            "   A ressurreição de Cristo assegura que nosso trabalho no Senhor não é vão, convocando o crente à santidade e perseverança."
+        ),
+        "greek_terms": [
+            ("ἀνάστασις", "anastasis", "Strong G386", "https://biblehub.com/greek/386.htm", "Ressurreição física e corpórea dos mortos."),
+            ("νῖκος", "nikos", "Strong G3534", "https://biblehub.com/greek/3534.htm", "Vitória definitiva e irrevogável sobre a morte e o pecado."),
+            ("ἀπαρχή", "aparchē", "Strong G536", "https://biblehub.com/greek/536.htm", "Primícias da colheita eterna / a garantia da ressurreição dos crentes.")
+        ]
+    },
+    "criacao_genesis": {
+        "keywords": ["criação", "criacao", "gênesis 1", "genesis 1", "no princípio criou deus", "no principio", "haja luz"],
+        "verse_ref": "Gênesis 1:1-3",
+        "verse_text": "No princípio criou Deus os céus e a terra. E a terra era sem forma e vazia... e o Espírito de Deus se movia sobre a face das águas. E disse Deus: Haja luz; e houve luz.",
+        "era": "Origens do Cosmos / Pentateuco Mosaico (Hebraico Bíblico Arcaico)",
+        "historical_context": (
+            "1. **A Desmitologização do Cosmos no Antigo Oriente Próximo:**\n"
+            "   Enquanto os mitos babilônicos (Enuma Elish) descreviam a criação através de batalhas caóticas de deuses monstros, Gênesis 1 revela a Palavra soberana e santa de Yahweh criando tudo ordenadamente pelo poder da Sua voz."
+        ),
+        "typological_context": (
+            "1. **A Nova Criação em Cristo (2 Coríntios 5:17 / João 1:1-3):**\n"
+            "   O mesmo Deus que disse 'haja luz' faz resplandecer em nossos corações a luz do conhecimento da glória de Deus na face de Jesus Cristo."
+        ),
+        "application_context": (
+            "1. **Adoração ao Criador Soberano:**\n"
+            "   Reconhecer que fomos criados por Deus destrói o egoísmo e direciona nossa vida para cumprir o propósito santo de Sua glória."
+        ),
+        "hebrew_parallels": [
+            ("בְּרֵאשִׁית", "bereshit", "Strong H7225", "https://biblehub.com/hebrew/7225.htm", "No princípio absoluto do tempo, espaço e matéria criado por Deus."),
+            ("בָּרָא", "bara", "Strong H1254", "https://biblehub.com/hebrew/1254.htm", "Criar a partir do nada (ex nihilo) — verbo de prerrogativa divina exclusiva."),
+            ("אֱלֹהִים", "elohim", "Strong H430", "https://biblehub.com/hebrew/430.htm", "Deus Todo-Poderoso em Sua soberania e glória majestosa.")
+        ]
+    },
+    "dez_mandamentos": {
+        "keywords": ["dez mandamentos", "decálogo", "decalogo", "lei de deus", "tábuas da lei", "tabuas da lei", "êxodo 20", "exodo 20"],
+        "verse_ref": "Êxodo 20:1-17",
+        "verse_text": "Então falou Deus todas estas palavras, dizendo: Eu sou o SENHOR teu Deus, que te tirei da terra do Egito, da casa da servidão. Não terás outros deuses diante de mim.",
+        "era": "c. 1446 a.C. - Monte Sinai / Aliança Teocrática com Israel",
+        "historical_context": (
+            "1. **O Decálogo e o Tratado Pactual do Sinai:**\n"
+            "   O prólogo histórico ('Eu sou o SENHOR teu Deus que te tirei do Egito') fundamenta a obediência não no medo, mas na gratidão pela redenção soberana concedida por Yahweh."
+        ),
+        "typological_context": (
+            "1. **A Lei como Aio que nos Conduz a Cristo (Gálatas 3:24):**\n"
+            "   A Lei expõe a pecaminosidade humana e nos conduz a Cristo, o único que cumpriu perfeitamente todo o mandamento moral de Deus."
+        ),
+        "application_context": (
+            "1. **Amor a Deus e ao Próximo:**\n"
+            "   O resumo do Decálogo é o amor sincero a Deus de todo o coração e o amor ao próximo como a si mesmo."
+        ),
+        "hebrew_parallels": [
+            ("תּוֹרָה", "torah", "Strong H8451", "https://biblehub.com/hebrew/8451.htm", "Instrução paternal e revelação da justiça santa do Criador."),
+            ("מִצְוָה", "mitzvah", "Strong H4687", "https://biblehub.com/hebrew/4687.htm", "Mandamento santo que reflete o caráter incorruptível de Yahweh."),
+            ("בְּרִית", "berit", "Strong H1285", "https://biblehub.com/hebrew/1285.htm", "Pacto perpétuo firmado entre Deus e o Seu povo consagrado.")
+        ]
+    },
+    "fe_e_obras_tiago": {
+        "keywords": ["tiago 2", "fé e obras", "fe e obras", "fé sem obras", "fe sem obras"],
+        "verse_ref": "Tiago 2:14-26",
+        "verse_text": "Meus irmãos, que aproveita se alguém disser que tem fé, e não tiver as obras? Porventura a fé pode salvá-lo?... Assim também a fé, se não tiver as obras, é morta em si mesma.",
+        "era": "c. 45-48 d.C. - Jerusalém / Primeira Epístola do Novo Testamento",
+        "historical_context": (
+            "1. **O Combate ao Antinomismo Primitivo:**\n"
+            "   Tiago corrige aqueles que distorciam a graça transformando-a em mero assentimento intelectual (como os demônios que creem e estremecem), demonstrando que a fé verdadeira produz frutos visíveis de misericórdia."
+        ),
+        "typological_context": (
+            "1. **Harmonia Perfeita entre Paulo e Tiago:**\n"
+            "   Paulo ensina que somos justificados pela fé somente, sem obras da lei; Tiago ensina que a fé que justifica nunca está só, mas manifesta-se em boas obras."
+        ),
+        "application_context": (
+            "1. **Amor Prático e Compaixão ao Necessitado:**\n"
+            "   A verdadeira religião pura e imaculada cuida dos órfãos e viúvas em suas tribulações e guarda-se da corrupção mundana."
+        ),
+        "greek_terms": [
+            ("πίστις", "pistis", "Strong G4102", "https://biblehub.com/greek/4102.htm", "Fé viva e operante que se entrega confiantemente a Deus."),
+            ("ἔργον", "ergon", "Strong G2041", "https://biblehub.com/greek/2041.htm", "Obras de justiça e amor que brotam necessariamente da nova vida em Cristo."),
+            ("δικαιόω", "dikaioō", "Strong G1344", "https://biblehub.com/greek/1344.htm", "Demonstrar e vindicar a realidade da salvação diante de todos.")
+        ]
+    },
+    "salmo_91": {
+        "keywords": ["salmo 91", "esconderijo do altíssimo", "esconderijo do altissimo", "sombras do onipotente"],
+        "verse_ref": "Salmos 91:1-2",
+        "verse_text": "Aquele que habita no esconderijo do Altíssimo, à sombra do Onipotente descansará. Direi do SENHOR: Ele é o meu refúgio e a minha fortaleza, o meu Deus, em quem confio.",
+        "era": "Poesia Sapiencial e Devocional Teocrática de Israel",
+        "historical_context": (
+            "1. **O Refúgio Teocrático em Tempos de Guerra e Pestilência:**\n"
+            "   O salmista expressa a confiança inabalável no Santo de Israel, cujo poder protege o crente em meio aos terrores noturnos e setas que voam de dia."
+        ),
+        "typological_context": (
+            "1. **Cristo na Tentação no Deserto:**\n"
+            "   Satanás tentou distorcer o Salmo 91 na tentação de Jesus, mas o Senhor respondeu com a Escritura inerrante: 'Não tentarás o Senhor teu Deus'."
+        ),
+        "application_context": (
+            "1. **Descanso Espiritual no Quarto Secreto:**\n"
+            "   Habitar no esconderijo é cultivar vida diária de oração íntima e total dependência de Deus em tempos de crise."
+        ),
+        "hebrew_parallels": [
+            ("סֵתֶר", "seter", "Strong H5643", "https://biblehub.com/hebrew/5643.htm", "Lugar secreto e esconderijo sagrado de intimidade com Deus."),
+            ("עֶלְיוֹן", "elyon", "Strong H5945", "https://biblehub.com/hebrew/5945.htm", "O Deus Altíssimo, soberano absoluto sobre tudo e todos."),
+            ("שַׁדַּי", "shaddai", "Strong H7706", "https://biblehub.com/hebrew/7706.htm", "O Todo-Poderoso e Todo-Suficiente que acolhe Seus filhos.")
+        ]
+    },
+    "romanos_8_soberania": {
+        "keywords": ["romanos 8", "todas as coisas cooperam", "mais que vencedores", "nenhuma condenação há"],
+        "verse_ref": "Romanos 8:28, 31-39",
+        "verse_text": "E sabemos que todas as coisas cooperam para o bem daqueles que amam a Deus... Se Deus é por nós, quem será contra nós?... Em todas estas coisas somos mais do que vencedores, por aquele que nos amou.",
+        "era": "c. 57 d.C. - Corinto / O Cume da Teologia Paulina da Redenção",
+        "historical_context": (
+            "1. **O Capítulo Áureo da Epístola aos Romanos:**\n"
+            "   Paulo conclui a exposição da justificação e santificação afirmando a eterna segurança do crente sob o decreto soberano do amor de Deus."
+        ),
+        "typological_context": (
+            "1. **A Corrente de Ouro da Salvação:**\n"
+            "   Aos que de antemão conheceu, também os predestinou, chamou, justificou e glorificou em Cristo Jesus."
+        ),
+        "application_context": (
+            "1. **Consolação Plena na Tribulação:**\n"
+            "   Nem morte, nem vida, nem principados, nem coisas presentes ou futuras podem nos separar do amor de Deus."
+        ),
+        "greek_terms": [
+            ("συνεργέω", "synergeō", "Strong G4903", "https://biblehub.com/greek/4903.htm", "Cooperar harmoniosamente sob a providência soberana de Deus."),
+            ("ὑπερνικάω", "hypernikaō", "Strong G5245", "https://biblehub.com/greek/5245.htm", "Super-vencedores através do amor sacrificial de Cristo."),
+            ("πρόθεσις", "prothesis", "Strong G4286", "https://biblehub.com/greek/4286.htm", "Propósito soberano e imutável do conselho eterno de Deus.")
+        ]
     }
+
 }
 
 def identify_theological_context(topic: str) -> Dict[str, Any]:
     t_low = (topic or "").lower().strip()
 
-    if any(w in t_low for w in ["fruto", "espirito", "espírito", "santific", "galatas", "gálatas"]):
-        return THEOLOGICAL_TOPICS_DATABASE["fruto_do_espirito"]
+    # 1. 📖 Resolução Universal por Perícope Bíblica Explícita (Qualquer livro, capítulo e versículo dos 66 livros da Bíblia)
+    parsed = parse_biblical_pericope(topic)
+    if parsed:
+        ref = parsed["reference"]
+        book_info = parsed["book_info"]
+        testament = parsed["testament"]
+        lang = parsed["lang"]
+        era = parsed["era"]
 
-    # 1. Busca exata ou por palavra-chave na base especializada
+        # Se já existir uma entrada aprofundada na base especializada para esta referência, prioriza os termos ricos
+        for key, data in THEOLOGICAL_TOPICS_DATABASE.items():
+            for kw in data.get("keywords", []):
+                if kw in t_low:
+                    return data
+
+        # Caso contrário, constrói contexto dinâmico fiel à perícope detectada
+        return {
+            "keywords": [t_low, ref.lower()],
+            "verse_ref": ref,
+            "verse_text": f"Perícope Sagrada em {ref} ({testament} - Cânon Sagrado)",
+            "era": era,
+            "historical_context": (
+                f"1. **Contexto Histórico & Canônico de {ref}:**\n"
+                f"   O livro de {book_info['name']} insere-se no {testament}, composto no contexto histórico de {era}. "
+                f"Sua mensagem é inspirada pelo Espírito de Deus para a edificação inerrante do Seu povo e preservada com integridade absoluta.\n\n"
+                f"2. **Preservação Textual Primária:**\n"
+                f"   O texto foi preservado {'no Texto Massorético Hebraico e nos Rolos do Mar Morto' if lang == 'Hebraico' else 'nos manuscritos unciais gregos do Novo Testamento (Codex Sinaiticus, Codex Vaticanus e papiros antigos)'}, "
+                f"testemunhando a fidelidade indefectível de Deus na história da revelação."
+            ),
+            "typological_context": (
+                f"1. **Harmonia Canônica e Cumprimento em Cristo:**\n"
+                f"   Toda a Escritura testifica de Jesus Cristo (João 5:39). Em {ref}, contemplamos a sabedoria e a redenção de Deus que se cumprem plenamente na pessoa e obra do Messias."
+            ),
+            "application_context": (
+                f"1. **Adoração em Espírito e em Verdade (João 4:23-24):**\n"
+                f"   A meditação reverente em {ref} não conduz a debates vazios, mas à prostração em oração, adoração íntima e obediência santa perante o Deus Altíssimo."
+            ),
+            "greek_terms": [
+                ("ἀλήθεια", "alētheia", "Strong G225", "https://biblehub.com/greek/225.htm", "Verdade divina absoluta e imutável revelada por Deus."),
+                ("χάρις", "charis", "Strong G5485", "https://biblehub.com/greek/5485.htm", "Graça soberana e favor imerecido de Deus manifestos aos crentes.")
+            ] if lang == "Grego" else [],
+            "hebrew_parallels": [
+                ("אֱמֶת", "emet", "Strong H571", "https://biblehub.com/hebrew/571.htm", "Verdade, fidelidade inabalável e firmeza perpétua da aliança de Yahweh."),
+                ("חֶסֶד", "hesed", "Strong H2617", "https://biblehub.com/hebrew/2617.htm", "Amor leal, bondade pactual e misericórdia eterna do Senhor.")
+            ] if lang == "Hebraico" else []
+        }
+
+    # 2. 🔍 Busca Exata por Palavras-Chave nos Temas Fundamentais da Base
     for key, data in THEOLOGICAL_TOPICS_DATABASE.items():
-        for kw in data["keywords"]:
+        for kw in data.get("keywords", []):
             if kw in t_low:
                 return data
 
-    # 2. Heurística Semântica Inteligente por Família Teológica:
+    # 3. 🎯 Heurística Semântica por Família Teológica
     if any(w in t_low for w in ["fim", "escatol", "apocalip", "volta", "tribula", "arrebat", "profec", "juízo", "juizo", "dia do senhor", "segunda vinda"]):
         return THEOLOGICAL_TOPICS_DATABASE["fim_dos_tempos"]
     if any(w in t_low for w in ["salva", "graça", "graca", "justific", "fé", "fe", "perdão", "perdao", "redenção", "redencao"]):
@@ -404,40 +803,38 @@ def identify_theological_context(topic: str) -> Dict[str, Any]:
     if any(w in t_low for w in ["amor", "unigênit", "unigenit", "joão 3", "joao 3"]):
         return THEOLOGICAL_TOPICS_DATABASE["joao_3_16"]
 
-    # 3. Fallback Cristocêntrico Soberano (Colossenses 1:16-20 / A Supremacia de Cristo em Toda a Escritura)
+    # 4. 🌐 Contexto Canônico Aberto (NUNCA força Colossenses para temas não relacionados!)
     return {
         "keywords": [t_low],
-        "verse_ref": "Colossenses 1:16-20 / Efésios 1:9-10",
-        "verse_text": "Porque nele foram criadas todas as coisas que há nos céus e na terra, visíveis e invisíveis... tudo foi criado por ele e para ele. E ele é antes de todas as coisas, e todas as coisas subsistem por ele... e ele é a cabeça do corpo da igreja... havendo por ele feito a paz pelo sangue da sua cruz.",
-        "era": "Cânon Sagrado Unificado & A Supremacia Cósmica de Cristo",
+        "is_open_context": True,
+        "verse_ref": f"Cânon Sagrado: Perícope Central sobre '{topic}'",
+        "verse_text": "Toda a Escritura é divinamente inspirada, e proveitosa para ensinar, para redarguir, para corrigir, para instruir em justiça (2 Timóteo 3:16)",
+        "era": "Cânon Sagrado das Escrituras (Antigo e Novo Testamento)",
         "historical_context": (
-            f"1. **O Contexto Histórico e Canônico de '{topic}':**\n"
-            f"   Ao examinarmos a perícope sagrada que ilumina '{topic}', contemplamos o Deus que fala na história. As Escrituras não são abstrações mitológicas, mas intervenções verídicas de Yahweh testemunhadas pelos profetas e apóstolos e preservadas nos códices antigos.\n\n"
-            f"2. **A Fidelidade dos Manuscritos:**\n"
-            f"   Do Texto Massorético aos pergaminhos gregos do Novo Testamento, a integridade do texto sagrado permanece inabalável, revelando a fidelidade da aliança eterna estabelecida pelo Criador."
+            f"1. **Investigação Histórica e Canônica de '{topic}':**\n"
+            f"   Ao examinarmos as Escrituras Sagradas sobre '{topic}', perscrutamos a verdade viva revelada por Deus na história da salvação. "
+            f"As passagens correlatas devem ser examinadas com rigor exegético e histórico em seu ambiente original de redação, evitando qualquer anacronismo.\n\n"
+            f"2. **Integridade Textual Manuscrita:**\n"
+            f"   O testemunho dos manuscritos antigos confirma a fidelidade do texto bíblico e a autoridade soberana da Palavra de Deus transmitida à Sua Igreja."
         ),
         "typological_context": (
-            f"1. **A Centralidade Absoluta de Jesus Cristo em '{topic}':**\n"
-            f"   Toda a revelação das Escrituras converge para a pessoa de Cristo Jesus. Nele habitam todos os tesouros da sabedoria e do conhecimento (Colossenses 2:3). Da promessa da redenção à consumação na cruz, tudo foi planejado para a glória do Filho de Deus.\n\n"
-            f"2. **A Reconciliação na Cruz do Calvário:**\n"
-            f"   Pelo sangue da Sua cruz, Jesus reconciliou consigo todas as coisas, inaugurando uma Nova Aliança eterna que liberta o homem da culpa do pecado e o introduz na paz santa com o Pai."
+            f"1. **Harmonia Canônica e Centralidade em Cristo:**\n"
+            f"   Toda doutrina bíblica autêntica encontra em Cristo o seu centro, harmonia e propósito redentor. A Escritura interpreta a própria Escritura (Analogia Fidei)."
         ),
         "application_context": (
             f"1. **Adoração em Espírito e em Verdade (João 4:23-24):**\n"
-            f"   Conhecer a profundidade de '{topic}' não serve para alimentar debates estéreis, mas para nos levar a dobrar os joelhos em adoração sincera, quebrantamento e temor filial diante do Trono da Graça.\n\n"
-            f"2. **Vida Prática e Santificação Diária:**\n"
-            f"   A verdade bíblica regenera o viver diário. Em oração constante no quarto secreto e em santidade, refletimos a luz de Cristo em nosso testemunho cotidiano."
+            f"   O exame de '{topic}' deve gerar quebrantamento santo, oração fervente no quarto secreto e transformação viva do caráter cristão no cotidiano."
         ),
         "greek_terms": [
-            ("πρωτότοκος", "prōtotokos", "Strong G4416", "https://biblehub.com/greek/4416.htm", "Primogênito de toda a criação / supremo em dignidade e autoridade cósmica soberana."),
-            ("πλήρωμα", "plērōma", "Strong G4138", "https://biblehub.com/greek/4138.htm", "Plenitude divina. Em Cristo habita corporalmente toda a plenitude da divindade."),
-            ("ἀποκαταλλάσσω", "apokatallassō", "Strong G604", "https://biblehub.com/greek/604.htm", "Reconciliação total, completa e definitiva realizada pelo sangue derramado na cruz.")
+            ("ἀλήθεια", "alētheia", "Strong G225", "https://biblehub.com/greek/225.htm", "Verdade divina absoluta e imutável revelada por Deus nas Escrituras."),
+            ("λόγος", "logos", "Strong G3056", "https://biblehub.com/greek/3056.htm", "Palavra viva, eficaz e eterna de Deus revelada em Jesus Cristo.")
         ],
         "hebrew_parallels": [
-            ("רֵאשִׁית", "reshit", "Strong H7225", "https://biblehub.com/hebrew/7225.htm", "Princípio soberano, primícias de toda a obra criadora e redentora de Yahweh."),
-            ("שָׁלוֹם", "shalom", "Strong H7965", "https://biblehub.com/hebrew/7965.htm", "Paz pactual plena e reconciliação definitiva outorgada pelo Messias de Deus.")
+            ("דָּבָר", "davar", "Strong H1697", "https://biblehub.com/hebrew/1697.htm", "Palavra soberana e eficaz de Yahweh que cumpre o Seu propósito santo."),
+            ("קָדַשׁ", "qadash", "Strong H6942", "https://biblehub.com/hebrew/6942.htm", "Santidade e consagração irrevogável ao Senhor.")
         ]
     }
+
 
 # ==============================================================================
 # GERADOR MONUMENTAL DE TRATADOS POR PERSONA (100% EXCLUSIVO POR AGENTE & TEMA)
