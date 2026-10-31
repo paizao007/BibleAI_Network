@@ -87,7 +87,7 @@ BIBLE_CANON_REGISTRY = {
     "2 joão": {"name": "2 João", "abbrev": ["2jo", "2joa", "2 joao"], "testament": "NT", "lang": "Grego", "era": "Andar na Verdade e Amor / Rejeição aos Enganadores Docetistas (c. 90 d.C.)"},
     "3 joão": {"name": "3 João", "abbrev": ["3jo", "3joa", "3 joao"], "testament": "NT", "lang": "Grego", "era": "Hospitalidade aos Cooperadores da Verdade / Alerta contra Diótrefes (c. 90 d.C.)"},
     "judas": {"name": "Judas", "abbrev": ["jd", "jud", "judas"], "testament": "NT", "lang": "Grego", "era": "Batalha Diligente pela Fé que uma vez foi Dada aos Santos (c. 65-80 d.C.)"},
-    "apocalipse": {"name": "Apocalipse", "abbrev": ["ap", "apoc", "apocalipse", "revelação", "revelacao"], "testament": "NT", "lang": "Grego", "era": "Revelação do Cordeiro Triunfante na Ilha de Patmos (c. 95 d.C.)"}
+    "apocalipse": {"name": "Apocalipse", "abbrev": ["ap", "apc", "apoc", "apocalipse", "revelação", "revelacao"], "testament": "NT", "lang": "Grego", "era": "Revelação do Cordeiro Triunfante na Ilha de Patmos (c. 95 d.C.)"}
 }
 
 def parse_biblical_pericope(text: str) -> Optional[Dict[str, Any]]:
@@ -728,6 +728,43 @@ THEOLOGICAL_TOPICS_DATABASE = {
             ("ὑπερνικάω", "hypernikaō", "Strong G5245", "https://biblehub.com/greek/5245.htm", "Super-vencedores através do amor sacrificial de Cristo."),
             ("πρόθεσις", "prothesis", "Strong G4286", "https://biblehub.com/greek/4286.htm", "Propósito soberano e imutável do conselho eterno de Deus.")
         ]
+    },
+    "apocalipse_16": {
+        "keywords": [
+            "apocalipse 16", "apc 16", "ap 16", "apoc 16", "apocalipse 16:16",
+            "armagedom", "har-magedom", "sete taças", "7 taças", "taças da ira"
+        ],
+        "verse_ref": "Apocalipse 16:1-21 (Destaque Central: Apocalipse 16:15-16 — Vigilância & Armagedom)",
+        "verse_text": "E ouvi, vinda do templo, uma grande voz, que dizia aos sete anjos: Ide, e derramai sobre a terra as sete taças da ira de Deus... (v. 15) Eis que venho como ladrão. Bem-aventurado aquele que vigia, e guarda as suas vestes, para que não ande nu, e não se vejam as suas vergonhas. (v. 16) E os congregaram no lugar que em hebraico se chama Armagedom. (v. 17) E o sétimo anjo derramou a sua taça no ar, e saiu grande voz do templo do céu, do trono, dizendo: Está feito!",
+        "era": "Final do Século I d.C. (c. 95 d.C. - Ilha de Patmos / Domiciano) & Clímax Escatológico do Grande Dia do Deus Todo-Poderoso",
+        "historical_context": (
+            "1. **As Sete Taças da Ira Divina (Apocalipse 16:1-21) e o Paralelo com o Êxodo:**\n"
+            "   João contempla os sete anjos derramando as sete taças (*phialai*) da cólera santa de Deus sobre o império da Besta, espelhando as pragas do Egito (úlceras, águas em sangue, trevas no trono da besta e secamento do rio Eufrates na sexta taça em Ap 16:12).\n\n"
+            "2. **O Versículo 16 — A Geografia Teológica de Armagedom (*Har-Magedōn*):**\n"
+            "   Em **Apocalipse 16:13-16**, três espíritos imundos semelhantes a rãs saem da boca do dragão, da besta e do falso profeta para ajuntar os reis de todo o mundo para a batalha daquele grande dia do Deus Todo-Poderoso, congregando-os no lugar que em hebraico se chama **Armagedom** (*Har-Magedōn* — הַר מְגִדּוֹן, 'Monte de Megido'). Histórica e arqueologicamente, Megido (no Vale de Jezreel/Esdrelom) era a fortaleza estratégica onde Deus deu vitória milagrosa a Baraque e Débora sobre Sísera (Juízes 5:19), onde Gideão venceu os midianitas e onde o rei Josias tombou (2 Reis 23:29; Zacarias 12:11). No Apocalipse, contudo, não há literalmente uma montanha isolada chamada Armagedom, mas o Monte de Megido (junto ao Carmelo onde Elias derrotou os profetas de Baal) torna-se o símbolo profético supremo do palco onde toda a coalizão anticristã mundial é reunida para ser desbaratada pela palavra soberana do Cordeiro!"
+        ),
+        "typological_context": (
+            "1. **O Contraste entre o Engano das Rãs (vv. 13-14) e o Alerta de Cristo no Versículo 15:**\n"
+            "   Exatamente entre a preparação para o Armagedom (v. 14) e o ajuntamento em Armagedom (v. 16), o Senhor Jesus irrompe no **versículo 15** com a terceira bem-aventurança do Apocalipse: *'Eis que venho como ladrão. Bem-aventurado aquele que vigia, e guarda as suas vestes, para que não ande nu'*. Enquanto as nações se mobilizam em rebelião rumo ao Armagedom (v. 16), a Igreja fiel é chamada à vigilância espiritual e à pureza das vestes lavadas no sangue do Cordeiro.\n\n"
+            "2. **Da Sexta Taça (Armagedom - v. 16) à Sétima Taça ('Está Feito!' - v. 17):**\n"
+            "   O ajuntamento no versículo 16 em Armagedom prepara o desfecho da sétima taça (vv. 17-21), quando do trono do templo celestial ecoa o brado solene *Gegonen!* ('Está feito!'), demonstrando que a queda da grande Babilônia e a derrota dos inimigos de Deus em Armagedom pertencem inteiramente à soberania do Todo-Poderoso."
+        ),
+        "application_context": (
+            "1. **A Lição Espiritual de Apocalipse 16:15-16 para o Crente Hoje:**\n"
+            "   Estudar Apocalipse 16 e o versículo 16 (Armagedom) não serve para alimentar curiosidade sensacionalista, mas para despertar a Igreja do sono espiritual. O verdadeiro conflito espiritual precede o desfecho final: não ser seduzido pela propaganda enganosa do dragão, da besta e do falso profeta (vv. 13-14).\n\n"
+            "2. **Guardar as Vestes em Santidade e Adoração (v. 15):**\n"
+            "   Mesmo diante do endurecimento dos homens que blasfemam sem se arrepender (Ap 16:9, 11, 21), o adorador em Espírito e em Verdade proclama a justiça dos juízos do Senhor (Ap 16:5-7) e guarda suas vestes imaculadas aguardando a vinda do Rei."
+        ),
+        "greek_terms": [
+            ("Ἁρμαγεδών", "Harmagedōn", "Strong G717", "https://biblehub.com/greek/717.htm", "Armagedom (Apocalipse 16:16). Transliteração grega do hebraico Har-Megiddon ('Monte de Megido'), o local simbólico e escatológico onde os reis da terra são congregados para o juízo do grande dia do Deus Todo-Poderoso."),
+            ("φιάλη", "phialē", "Strong G5357", "https://biblehub.com/greek/5357.htm", "Taça rasa ou salva de ouro do santuário (Apocalipse 16:1-2), de onde são derramados de forma rápida e cabal os sete últimos juízos da ira santa de Deus."),
+            ("γρηγορέω", "grēgoreō", "Strong G1127", "https://biblehub.com/greek/1127.htm", "Vigiar, manter-se espiritualmente desperto (Apocalipse 16:15) em contraste com a cegueira dos que marcham para o Armagedom no versículo 16."),
+            ("γέγονεν", "gegonen", "Strong G1096", "https://biblehub.com/greek/1096.htm", "Perfeito indicativo ativo ('Está feito!' - Apocalipse 16:17), decretando a consumação irrevogável dos juízos divinos após o ajuntamento de Armagedom.")
+        ],
+        "hebrew_parallels": [
+            ("הַר מְגִדּוֹן", "Har Megiddon", "Strong H4023", "https://biblehub.com/hebrew/4023.htm", "Monte de Megido (Zacarias 12:11; Juízes 5:19), raiz hebraica direta do termo Armagedom em Apocalipse 16:16."),
+            ("יוֹם יְהוָה", "Yom Yahweh", "Strong H3117", "https://biblehub.com/hebrew/3117.htm", "O Grande Dia do SENHOR Todo-Poderoso (Apocalipse 16:14), em que Yahweh julga as nações rebeldes.")
+        ]
     }
 
 }
@@ -735,7 +772,16 @@ THEOLOGICAL_TOPICS_DATABASE = {
 def identify_theological_context(topic: str) -> Dict[str, Any]:
     t_low = (topic or "").lower().strip()
 
-    # 1. 📖 Resolução Universal por Perícope Bíblica Explícita (Qualquer livro, capítulo e versículo dos 66 livros da Bíblia)
+    # 1. 🔍 Verifica primeiro se a pauta bate com uma entrada específica de capítulo/versículo da base (ex: apocalipse 16, ezequiel 25:17, joão 3:16)
+    for key, data in THEOLOGICAL_TOPICS_DATABASE.items():
+        for kw in data.get("keywords", []):
+            # Evita que palavras genéricas de livro sozinhas (ex: 'apocalipse' ou 'ezequiel') sequestrem capítulos específicos (ex: 'apocalipse 16')
+            if kw in ("apocalipse", "ezequiel") and any(ch.isdigit() for ch in t_low):
+                continue
+            if kw in t_low:
+                return data
+
+    # 2. 📖 Resolução Universal por Perícope Bíblica Explícita (Qualquer livro, capítulo e versículo dos 66 livros da Bíblia)
     parsed = parse_biblical_pericope(topic)
     if parsed:
         ref = parsed["reference"]
@@ -744,17 +790,12 @@ def identify_theological_context(topic: str) -> Dict[str, Any]:
         lang = parsed["lang"]
         era = parsed["era"]
 
-        # Se já existir uma entrada aprofundada na base especializada para esta referência, prioriza os termos ricos
-        for key, data in THEOLOGICAL_TOPICS_DATABASE.items():
-            for kw in data.get("keywords", []):
-                if kw in t_low:
-                    return data
-
-        # Caso contrário, constrói contexto dinâmico fiel à perícope detectada
+        # Caso contrário, constrói contexto dinâmico fiel à perícope exata detectada (sem cair em Mateus 24 ou Colossenses!)
         return {
             "keywords": [t_low, ref.lower()],
+            "is_specific_pericope": True,
             "verse_ref": ref,
-            "verse_text": f"Perícope Sagrada em {ref} ({testament} - Cânon Sagrado)",
+            "verse_text": f"Exposição Exegética Completa de {ref} — examinando fielmente cada seção e os versículos-chave deste capítulo no Cânon Sagrado ({testament})",
             "era": era,
             "historical_context": (
                 f"1. **Contexto Histórico & Canônico de {ref}:**\n"

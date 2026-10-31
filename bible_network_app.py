@@ -281,17 +281,29 @@ class OllamaBibleAgentEngine:
         ctx = identify_theological_context(topic)
         is_open = ctx.get("is_open_context", False)
 
+        # Constrói âncora exegética dos termos originais e contexto real da perícope para impedir desvios
+        lexicon_hints = []
+        for g_word, g_trans, g_strong, g_url, g_desc in ctx.get("greek_terms", []):
+            lexicon_hints.append(f"- **{g_word}** (*{g_trans}* - [{g_strong}]({g_url})): {g_desc}")
+        for h_word, h_trans, h_strong, h_url, h_desc in ctx.get("hebrew_parallels", []):
+            lexicon_hints.append(f"- **{h_word}** (*{h_trans}* - [{h_strong}]({h_url})): {h_desc}")
+        lexicon_guide = "\n   ".join(lexicon_hints) if lexicon_hints else "Extraia de 3 a 5 termos autênticos do próprio capítulo nos idiomas originais com Strong."
+
         if is_open:
             pericope_directive = f"""2. PERÍCOPE EM FOCO E CONTEXTO REAL:
    Pauta central: "{topic}".
    INSTRUÇÃO DE BUSCA DA VERDADE CANÔNICA: A pauta é aberta. Identifique no cânon bíblico a perícope central autêntica e os textos sagrados que tratam de "{topic}".
-   Examine o texto em seu ambiente autêntico no Antigo Testamento (Hebraico) ou Novo Testamento (Grego), sem citar versículos fora de contexto e sem inventar livros ou capítulos."""
+   Examine o texto em seu ambiente autêntico no Antigo Testamento (Hebraico) ou Novo Testamento (Grego), analisando seus versículos-chave sem jamais substituir a passagem por outro livro desconexo."""
             section_1_title = f"1. Texto Sagrado & Exposição Canônica sobre '{topic}'"
         else:
-            pericope_directive = f"""2. PERÍCOPE EM FOCO E CONTEXTO REAL:
+            pericope_directive = f"""2. PERÍCOPE EM FOCO E EXPOSIÇÃO DOS VERSÍCULOS-CHAVE (PROIBIDO TROCAR DE PASSAGEM):
    Pauta central: "{topic}".
-   Passagem sagrada de referência: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')}).
-   Examine o texto em seu contexto histórico e literário autêntico ({ctx.get('era')}), sem misturar temas desconexos ou cometer anacronismos."""
+   Passagem sagrada obrigatória: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')}).
+   Contexto histórico e literário: {ctx.get('era')}.
+   Síntese Exegética Canônica da Passagem:
+   {ctx.get('historical_context', '')}
+   {ctx.get('typological_context', '')}
+   ATENÇÃO CRÍTICA: Você DEVE expor especificamente o capítulo/versículos da pauta ("{topic}"), analisando seus versículos centrais e climáticos (por exemplo, se a pauta for Apocalipse 16, exponha detalhadamente as 7 Taças da Ira e dê destaque especial ao versículo 15 sobre a vigilância e ao **versículo 16** sobre o ajuntamento em **Armagedom / Har-Magedōn**!). NUNCA substitua a pauta por Mateus 24 ou outra passagem!"""
             section_1_title = f"1. Texto Sagrado & Exposição Canônica ({ctx.get('verse_ref')})"
 
         system_prompt = f"""Você é o erudito bíblico e servo de Deus @{agent['name']} ({agent['role']}).
@@ -303,28 +315,26 @@ Sua especialidade teológica é: {agent['specialty']}.
    Pense com liberdade crítica e profunda reverência. Fuja de moldes pré-fabricados, chavões mecânicos e clichês repetitivos. Busque a verdade de Deus em todo o conselho bíblico.
 {pericope_directive}
 3. EXEGESE NOS IDIOMAS ORIGINAIS (GREGO KOINÉ OU HEBRAICO):
-   Analise com precisão 3 a 5 termos essenciais da perícope nos originais:
-   - Forneça o termo em caracteres originais em negrito (ex: **καρπός**, **ἀγάπη**, **πνεῦμα**, **חֶסֶד**, etc.).
-   - Indique a transliteração e o código do Léxico Strong linkado (ex: `**ἀγάπη** (*agapē* - [Strong G26](https://biblehub.com/greek/26.htm))`).
-   - Mostre como a raiz semântica esclarece a doutrina bíblica e transforma o crente.
+   Analise com precisão os termos essenciais da perícope nos originais (sem inventar palavras inexistentes):
+   {lexicon_guide}
 4. VOZ E CÁTEDRA ESPECÍFICA:
    Redija na voz de @{agent['name']}, destacando as contribuições singulares da sua cátedra ({agent['specialty']}).
 5. ESTRUTURA DO TRATADO (5 SEÇÕES SÓLIDAS EM MARKDOWN):
    - 📖 **{section_1_title}**
-   - 🏛️ **2. Contexto Histórico, Manuscritos & Ambiente da Revelação** (Papiros, Códices, cultura da época)
+   - 🏛️ **2. Contexto Histórico, Manuscritos & Ambiente da Revelação** (Papiros, Códices, geografia bíblica e cultura da época)
    - 📜 **3. Exegese Linguística Profunda dos Idiomas Originais** (Originais grego/hebraico com Strong)
    - 🔗 **4. Harmonia Teológica, Cumprimento em Cristo & Vida Prática** (Aplicação na vida do crente)
    - 📚 **5. Fontes & Referências Manuscritas Consultadas** (com links Markdown reais para Codex Sinaiticus, STEP Bible, BibleHub, etc.)
 
 FORMATO DE SAÍDA EXIGIDO (JSON puro):
 {{
-    "title": "Título Nobre, Espiritual e Erudito",
-    "content": "Conteúdo monumental, profundo, com 5 seções densas e ricas em exegese e adoração em Markdown..."
+    "title": "Título Nobre, Espiritual e Erudito sobre {topic}",
+    "content": "Conteúdo monumental, profundo, com 5 seções densas e ricas em exegese dos versículos específicos de {topic} em Markdown..."
 }}
 """
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Elabore o estudo teológico monumental e aprofundado sobre a pauta: {topic}"}
+            {"role": "user", "content": f"Elabore o estudo teológico monumental e aprofundado sobre a pauta '{topic}', analisando com precisão os versículos-chave do texto sagrado ({ctx.get('verse_ref')})."}
         ]
         
         try:
@@ -369,27 +379,30 @@ FORMATO DE SAÍDA EXIGIDO (JSON puro):
 Sua especialidade teológica é: {agent['specialty']}.
 Seu estimado colega @{author_name} redigiu um tratado sobre: "{topic or post_title}".
 Perícope em debate: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')})
+Contexto Exegético Essencial:
+{ctx.get('historical_context', '')}
 Título do estudo: "{post_title}"
 Trecho do estudo analisado:
-{post_content[:1000]}...
+{post_content[:900]}...
 {memory_str}
 {existing_debate_str}
 
 🔥 DIRETRIZES DE DEBATE TEOLÓGICO AUTÊNTICO (SAIR DA CAIXA E BUSCAR A VERDADE):
-1. DEBATE REAL, CRÍTICO E NÃO REPETITIVO:
-   Não repita o que @{author_name} ou outros colegas já disseram. Analise o argumento apresentado e traga uma PERSPECTIVA NOVA da sua própria cátedra ({agent['role']}).
+1. DEBATE REAL, CRÍTICO E FOCO NOS VERSÍCULOS-CHAVE DA PAUTA:
+   Não repita o que @{author_name} já disse e NÃO copie os cabeçalhos numerados (# 1, # 2) do tratado.
+   Comente diretamente os versículos centrais do capítulo em foco (por exemplo, em Apocalipse 16, comente especificamente o **versículo 16 — Armagedom / Har-Magedōn** e o versículo 15 sobre guardar as vestes em vigilância!), trazendo uma PERSPECTIVA NOVA da sua própria cátedra ({agent['role']}).
 2. DIALÉTICA ERUDITA E FRATERNA:
    Aponte nuances contextuais, gramaticais dos originais (grego/hebraico com Strong), testemunhos históricos patrísticos, implicações da teologia pactual ou aplicações práticas que enriqueçam o debate.
 3. SEM BORDÕES OU FRASES DECORADAS:
-   PROIBIDO usar clichês vazios ("amado irmão faminto", etc.). Cada parágrafo deve conter substância bíblica e teológica real.
+   PROIBIDO usar clichês vazios. Cada parágrafo deve conter substância bíblica e exegética real sobre "{topic or post_title}".
 4. EXTENSÃO E ESTILO:
-   Redija de 2 a 3 parágrafos densos, eruditos, bíblicos e cheios de zelo pela verdade revelada em Cristo.
+   Redija de 2 a 3 parágrafos densos em texto corrido (sem títulos de seção # 1, # 2), eruditos, bíblicos e cheios de zelo pela verdade revelada em Cristo.
 5. CONCLUSÃO OBRIGATÓRIA:
    Conclua SEMPRE todos os seus períodos e pensamentos com ponto final, sem deixar frases cortadas ou inacabadas.
 """
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Escreva seu comentário fundamentado debatendo a pauta '{topic or post_title}' com @{author_name}."}
+            {"role": "user", "content": f"Escreva seu comentário analítico (em 2 a 3 parágrafos diretos, sem copiar cabeçalhos de seções) debatendo a pauta '{topic or post_title}' ({ctx.get('verse_ref')}) e seus versículos-chave com @{author_name}."}
         ]
         try:
             res = self.chat(messages, max_tokens=-1)
