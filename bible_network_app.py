@@ -40,9 +40,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from theological_engine import build_monumental_treatise, build_deep_peer_debate, identify_theological_context
+from theological_engine import (
+    build_monumental_treatise,
+    build_deep_peer_debate,
+    identify_theological_context,
+    clean_theological_hallucinations
+)
 
 cycle_lock = threading.Lock()
+topic_change_version = 0
 
 def extract_json_from_text(raw_text: str):
     if not raw_text:
@@ -69,10 +75,26 @@ def extract_json_from_text(raw_text: str):
     first_brace = clean.find('{')
     last_brace = clean.rfind('}')
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        candidate = clean[first_brace:last_brace+1]
         try:
-            return json.loads(clean[first_brace:last_brace+1])
+            return json.loads(candidate)
         except Exception:
-            pass
+            # Extração resiliente quando o LLM coloca quebras de linha reais dentro do valor de "content"
+            m_title = re.search(r'"title"\s*:\s*"([^"\n]+)"', candidate)
+            m_content = re.search(r'"content"\s*:\s*"(.*)"\s*\}', candidate, flags=re.DOTALL)
+            if m_title and m_content:
+                t_val = m_title.group(1).strip()
+                c_val = m_content.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
+                if len(c_val) > 100:
+                    return {"title": t_val, "content": c_val}
+
+    # Caso o modelo local responda diretamente com o tratado em Markdown sem envolver em chaves JSON
+    if len(clean) > 250 and not clean.startswith('{'):
+        lines = [ln.strip() for ln in clean.splitlines() if ln.strip()]
+        if lines:
+            first_line = re.sub(r'^[#*📖🏛️📜\s]+', '', lines[0]).strip().rstrip('*')
+            title = first_line if (10 < len(first_line) < 160) else "Tratado Exegético & Canônico"
+            return {"title": title, "content": clean}
 
     return None
 
@@ -406,33 +428,73 @@ LEGACY_FIXED_TOPICS = {
 
 db_rw_lock = threading.Lock()
 
+def _read_db_unlocked():
+    if os.path.exists(DB_FILE):
+        for attempt in range(3):
+            try:
+                with open(DB_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    raw_topics = data.get("topics", [])
+                    clean_topics = [t for t in raw_topics if t not in LEGACY_FIXED_TOPICS]
+                    if len(clean_topics) != len(raw_topics):
+                        data["topics"] = clean_topics
+                        _write_db_unlocked(data)
+                    return data
+            except (json.JSONDecodeError, IOError):
+                time.sleep(0.05)
+    return {"agents": [], "topics": [], "posts": [], "studies": []}
+
+def _write_db_unlocked(data):
+    tmp_file = DB_FILE + ".tmp"
+    with open(tmp_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+    os.replace(tmp_file, DB_FILE)
+
 def load_db():
     with db_rw_lock:
-        if os.path.exists(DB_FILE):
-            for attempt in range(3):
-                try:
-                    with open(DB_FILE, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        raw_topics = data.get("topics", [])
-                        clean_topics = [t for t in raw_topics if t not in LEGACY_FIXED_TOPICS]
-                        if len(clean_topics) != len(raw_topics):
-                            data["topics"] = clean_topics
-                            # Chama escrita atômica interna
-                            tmp_file = DB_FILE + ".tmp"
-                            with open(tmp_file, 'w', encoding='utf-8') as tf:
-                                json.dump(data, tf, indent=4, ensure_ascii=False)
-                            os.replace(tmp_file, DB_FILE)
-                        return data
-                except (json.JSONDecodeError, IOError):
-                    time.sleep(0.05)
-        return {"agents": [], "topics": [], "posts": [], "studies": []}
+        return _read_db_unlocked()
 
 def save_db(data):
     with db_rw_lock:
-        tmp_file = DB_FILE + ".tmp"
-        with open(tmp_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-        os.replace(tmp_file, DB_FILE)
+        _write_db_unlocked(data)
+
+def upsert_topic_in_db(new_topic: str) -> List[str]:
+    """Salva atomicamente a pauta no topo (índice 0) do banco sem jamais ser sobrescrita por ciclos lentos."""
+    global topic_change_version
+    clean_t = str(new_topic).strip()
+    if not clean_t:
+        return load_db().get("topics", [])
+    with db_rw_lock:
+        db = _read_db_unlocked()
+        topics = db.setdefault("topics", [])
+        # Remove duplicatas (case-insensitive ou exatas)
+        topics = [t for t in topics if t.strip().lower() != clean_t.lower()]
+        topics.insert(0, clean_t)
+        db["topics"] = topics
+        _write_db_unlocked(db)
+        topic_change_version += 1
+        print(f"[📌 PAUTA SALVA & FIXADA] '{clean_t}' gravada no topo de bible_data.json (v={topic_change_version})")
+        return topics
+
+def delete_topic_from_db(target_topic: str) -> List[str]:
+    global topic_change_version
+    clean_t = str(target_topic).strip()
+    with db_rw_lock:
+        db = _read_db_unlocked()
+        topics = db.get("topics", [])
+        if clean_t in topics:
+            topics.remove(clean_t)
+            db["topics"] = topics
+            _write_db_unlocked(db)
+            topic_change_version += 1
+        return db.get("topics", [])
+
+def append_post_to_db(new_post: Dict[str, Any]):
+    """Anexa um novo estudo lendo o estado MAIS RECENTE do disco, preservando pautas e pausas feitas durante a geração."""
+    with db_rw_lock:
+        latest_db = _read_db_unlocked()
+        latest_db.setdefault("posts", []).append(new_post)
+        _write_db_unlocked(latest_db)
 
 # --- FLASK ROUTES ---
 @app.route('/')
@@ -441,20 +503,22 @@ def index():
 
 @app.route('/api/data')
 def get_data():
-    db = load_db()
+    with db_rw_lock:
+        db = _read_db_unlocked()
+        topics = db.get("topics", [])
+        if not topics:
+            last_post_topic = db.get("posts", [])[-1].get("topic") if db.get("posts") else "fim dos tempos"
+            active_topic = last_post_topic or "fim dos tempos"
+            topics = [active_topic]
+            db["topics"] = topics
+            _write_db_unlocked(db)
+        else:
+            active_topic = topics[0]
+
     db["is_paused"] = db.get("is_paused", False)
     db["active_engine"] = ai_engine.active_engine
     db["selected_model"] = ai_engine.selected_model
     db["engine_info"] = ai_engine.model
-    topics = db.get("topics", [])
-    if not topics:
-        last_post_topic = db.get("posts", [])[-1].get("topic") if db.get("posts") else "fim dos tempos"
-        active_topic = last_post_topic or "fim dos tempos"
-        topics = [active_topic]
-        db["topics"] = topics
-        save_db(db)
-    else:
-        active_topic = topics[0]
 
     ctx = identify_theological_context(active_topic)
     db["active_verse_text"] = ctx.get("verse_text", "")
@@ -468,34 +532,31 @@ def add_topic():
     if not new_topic:
         return jsonify({"error": "Pauta inválida"}), 400
         
-    db = load_db()
-    topics = db.setdefault("topics", [])
-    if new_topic in topics:
-        topics.remove(new_topic)
-    # Insere no topo para ser fixada como pauta central ativa
-    topics.insert(0, new_topic)
-    save_db(db)
-    return jsonify({"success": True, "topics": topics, "active_topic": new_topic})
+    topics = upsert_topic_in_db(new_topic)
+    ctx = identify_theological_context(new_topic)
+    return jsonify({
+        "success": True,
+        "topics": topics,
+        "active_topic": new_topic,
+        "active_verse_text": ctx.get("verse_text", ""),
+        "active_verse_ref": ctx.get("verse_ref", "")
+    })
 
 @app.route('/api/topics/delete', methods=['POST'])
 def delete_topic():
     req_data = request.get_json() or {}
     target_topic = req_data.get('topic', '').strip()
-    db = load_db()
-    topics = db.get("topics", [])
-    if target_topic in topics:
-        topics.remove(target_topic)
-        db["topics"] = topics
-        save_db(db)
-    return jsonify({"success": True, "topics": db.get("topics", [])})
+    topics = delete_topic_from_db(target_topic)
+    return jsonify({"success": True, "topics": topics})
 
 @app.route('/api/toggle_pause', methods=['POST'])
 def toggle_pause():
-    db = load_db()
-    current_status = db.get("is_paused", False)
-    new_status = not current_status
-    db["is_paused"] = new_status
-    save_db(db)
+    with db_rw_lock:
+        db = _read_db_unlocked()
+        current_status = db.get("is_paused", False)
+        new_status = not current_status
+        db["is_paused"] = new_status
+        _write_db_unlocked(db)
     print(f"[⏸️] Estado do Servidor alterado e salvo em bible_data.json: is_paused={new_status}")
     return jsonify({"success": True, "is_paused": new_status})
 
@@ -506,27 +567,28 @@ def set_engine():
     api_key = req_data.get('api_key', '').strip()
     
     if engine:
-        db = load_db()
-        if "gemini" in engine.lower():
-            ai_engine.active_engine = "gemini"
-            ai_engine.gemini_model = engine
-            ai_engine.selected_model = engine
-            ai_engine._update_model_display_name()
-            db["active_engine"] = "gemini"
-            db["selected_model"] = engine
-        else:
-            ai_engine.active_engine = "ollama"
-            ai_engine.local_model = engine
-            ai_engine.selected_model = engine
-            ai_engine._update_model_display_name()
-            db["active_engine"] = "ollama"
-            db["selected_model"] = engine
-            
-        if api_key and api_key != "sua_chave_aqui":
-            ai_engine.gemini_api_key = api_key
-            ai_engine.gemini_keys = [api_key]
-            
-        save_db(db)
+        with db_rw_lock:
+            db = _read_db_unlocked()
+            if "gemini" in engine.lower():
+                ai_engine.active_engine = "gemini"
+                ai_engine.gemini_model = engine
+                ai_engine.selected_model = engine
+                ai_engine._update_model_display_name()
+                db["active_engine"] = "gemini"
+                db["selected_model"] = engine
+            else:
+                ai_engine.active_engine = "ollama"
+                ai_engine.local_model = engine
+                ai_engine.selected_model = engine
+                ai_engine._update_model_display_name()
+                db["active_engine"] = "ollama"
+                db["selected_model"] = engine
+                
+            if api_key and api_key != "sua_chave_aqui":
+                ai_engine.gemini_api_key = api_key
+                ai_engine.gemini_keys = [api_key]
+                
+            _write_db_unlocked(db)
         print(f"[⚙️ Motor Atualizado & Persistido] active_engine={db['active_engine']}, selected_model={db['selected_model']}")
         return jsonify({
             "success": True, 
@@ -546,15 +608,21 @@ def shutdown():
     return jsonify({"success": True, "message": "Servidor sendo desligado com segurança."})
 
 def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is_manual=False):
+    # 0. SALVAMENTO IMEDIATO DA PAUTA ANTES DE QUALQUER LOCK OU ESPERA!
+    # Garante que mesmo se um ciclo estiver em andamento, a pauta escolhida pelo usuário já fique salva no topo!
+    if selected_topic and str(selected_topic).strip():
+        upsert_topic_in_db(str(selected_topic).strip())
+
     db = load_db()
     if not is_manual and db.get("is_paused", False):
         return {"status": "paused", "message": "O ciclo autônomo está pausado pelo usuário."}
 
-    # Bloqueio leve não-bloqueante para evitar conflitos concorrentes
-    if not cycle_lock.acquire(blocking=True if is_manual else False, timeout=25 if is_manual else -1):
-        return {"status": "busy", "message": "Ciclo de estudo já em andamento..."}
+    # Para chamadas manuais do usuário, aguarda até o ciclo anterior liberar; para autônomas, não bloqueia
+    if not cycle_lock.acquire(blocking=True if is_manual else False, timeout=300 if is_manual else -1):
+        return {"status": "busy", "message": "Ciclo de estudo já em andamento, mas sua pauta já foi salva no topo!"}
 
     try:
+        start_version = topic_change_version
         db = load_db()
         agents = db.get("agents", [])
         topics = db.get("topics", [])
@@ -564,23 +632,15 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
             
         past_posts = db.get("posts", [])
         
-        # 1. Garante que se o usuário escolheu uma pauta específica, ela seja respeitada e fixada no topo
+        # 1. Determina a pauta ativa a partir do banco já atualizado
         if selected_topic and str(selected_topic).strip():
             topic = str(selected_topic).strip()
-            if topic in topics:
-                topics.remove(topic)
-            topics.insert(0, topic)
-            db["topics"] = topics
-            save_db(db)
         elif topics:
             topic = topics[0]
         else:
-            # Se não houver pauta cadastrada, recupera do último estudo gerado
             last_post_topic = past_posts[-1].get("topic") if past_posts else "fim dos tempos"
             topic = last_post_topic or "fim dos tempos"
-            topics = [topic]
-            db["topics"] = topics
-            save_db(db)
+            upsert_topic_in_db(topic)
 
         # Seleção de autor: rotaciona ativamente entre os 7 eruditos para que cada um traga a visão de sua cátedra
         if selected_agent_id:
@@ -601,6 +661,14 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
         print(f"[📚 CITATION ENGINE] Gerando ESTUDO COM FONTES EXPLÍCITAS por @{author['name']} sobre '{topic}'...")
         
         res = ai_engine.generate_theological_post(author, topic, past_posts)
+
+        # Se este era um ciclo autônomo em background e o usuário mudou a pauta ou pausou enquanto o LLM processava,
+        # aborta o ciclo antigo imediatamente para liberar o servidor para a nova pauta do usuário!
+        if not is_manual:
+            check_db = load_db()
+            if check_db.get("is_paused", False) or topic_change_version != start_version:
+                print(f"[⚡ PRIORIDADE DO USUÁRIO] Ciclo autônomo sobre '{topic}' descartado porque o usuário alterou a pauta ou pausou.")
+                return {"status": "aborted_for_user_priority"}
         
         # 🛡️ VERIFICAÇÃO RIGOROSA ANTI-DUPLICAÇÃO
         new_sig = ''.join(res["content"].split())[:80]
@@ -622,6 +690,11 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
         commenting_agents = random.sample(available_commenters, num_commenters)
         comments = []
         for c_agent in commenting_agents:
+            if not is_manual:
+                check_db = load_db()
+                if check_db.get("is_paused", False) or topic_change_version != start_version:
+                    print(f"[⚡ PRIORIDADE DO USUÁRIO] Comentário autônomo interrompido para priorizar nova pauta/pausa do usuário.")
+                    return {"status": "aborted_for_user_priority"}
             time.sleep(1)  # Pausa respeitosa entre chamadas individuais
             c_text = ai_engine.generate_theological_comment(
                 c_agent, res["title"], res["content"], author["name"], 
@@ -647,8 +720,8 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
             "comments": comments
         }
         
-        db.setdefault("posts", []).append(new_post)
-        save_db(db)
+        # Salva apenas o novo post lendo a versão mais recente do banco, NUNCA sobrescrevendo pautas novas ou is_paused!
+        append_post_to_db(new_post)
         
         agent_ws = os.path.join(WORKSPACES_DIR, author["name"])
         os.makedirs(agent_ws, exist_ok=True)
@@ -664,7 +737,7 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
             for c in comments:
                 f.write(f"### @{c['agent_name']}:\n{c['content']}\n\n")
                 
-        return {"success": True, "post": new_post}
+        return {"success": True, "post": new_post, "active_topic": topic}
     finally:
         cycle_lock.release()
 

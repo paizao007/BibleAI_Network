@@ -1600,7 +1600,7 @@
                         </div>
                     </div>
                     <div class="hero-actions-row">
-                        <button class="btn-hero-action" onclick="runStudyCycle()">
+                        <button id="btn-hero-action" class="btn-hero-action" onclick="runStudyCycle()">
                             ⚡ Iniciar Novo Tratado & Debate Autônomo
                         </button>
                         <button class="btn-hero-secondary" onclick="switchTab('topics')">
@@ -1636,12 +1636,14 @@
                         </span>
                     </div>
                     <p style="font-size: 0.9rem; color: #6b5544; margin-bottom: 1rem;">
-                        Como <strong>Adorador em Espírito e em Verdade</strong>, defina e lance as pautas de pesquisa bíblica para guiar o foco dos agentes eruditos.
+                        Como <strong>Adorador em Espírito e em Verdade</strong>, defina e salve as pautas de pesquisa bíblica para guiar o foco dos agentes eruditos.
                     </p>
-                    <div class="topic-add-box">
-                        <input type="text" id="new-topic-input" class="topic-input" placeholder="Ex: O Sacerdócio de Todos os Crentes em 1 Pedro 2">
-                        <button class="btn-trigger" style="width: auto;" onclick="addNewTopic()">➕ Lançar Pauta (Adorador em Espírito e em Verdade)</button>
+                    <div class="topic-add-box" style="flex-wrap: wrap; gap: 0.7rem;">
+                        <input type="text" id="new-topic-input" class="topic-input" style="flex: 1 1 280px;" placeholder="Ex: O Sacerdócio de Todos os Crentes em 1 Pedro 2" onkeydown="if(event.key==='Enter'){ event.preventDefault(); addNewTopic(false); }">
+                        <button id="btn-save-topic" type="button" class="btn-trigger" style="width: auto; background: #22543d; border-color: #1c4532;" onclick="addNewTopic(false)">📌 Salvar & Fixar Pauta</button>
+                        <button id="btn-launch-topic" type="button" class="btn-trigger" style="width: auto;" onclick="addNewTopic(true)">⚡ Salvar & Gerar Estudo Agora</button>
                     </div>
+                    <div id="topic-save-feedback" style="display: none; margin-top: 0.85rem; padding: 0.75rem 1rem; background: #f0fff4; border: 1px solid #68d391; border-radius: 6px; color: #22543d; font-weight: 700; font-size: 1rem;"></div>
                 </div>
 
                 <div class="card">
@@ -1877,6 +1879,9 @@
             } else if (tab === 'topics') {
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
                 document.getElementById('tab-topics').style.display = 'block';
+                if (currentDbData && currentDbData.topics) {
+                    renderTopicsList(currentDbData.topics);
+                }
             } else if (tab === 'activity') {
                 if (document.querySelectorAll('.tab-btn')[2]) {
                     document.querySelectorAll('.tab-btn')[2].classList.add('active');
@@ -2065,7 +2070,7 @@
         async function summonAgentStudy(agentId, agentName) {
             switchTab('feed');
             clearAgentFilter();
-            const btn = document.querySelector('.btn-trigger');
+            const btn = document.getElementById('btn-hero-action');
             if (btn) {
                 btn.disabled = true;
                 btn.innerText = `⏳ @${agentName} redigindo tratado...`;
@@ -2446,24 +2451,7 @@
                 // Render Agents & Quick Topics
                 renderAgents(data.agents, data.posts);
                 renderQuickTopics(data.topics);
-
-                // Render Topics Tab
-                const topicsList = document.getElementById('topics-list');
-                if (topicsList && currentTab === 'topics') {
-                    if (!data.topics || data.topics.length === 0) {
-                        topicsList.innerHTML = '<div style="color: #8c7665; font-style: italic; padding: 1.2rem; text-align: center;">Nenhuma pauta cadastrada. Digite uma pauta no campo acima para fixá-la como pauta central de estudo.</div>';
-                    } else {
-                        topicsList.innerHTML = data.topics.map(t => `
-                            <div class="topic-card">
-                                <div class="topic-title-text">📌 ${t}</div>
-                                <div>
-                                    <button class="btn-topic-action" onclick="runStudyCycle('${t.replace(/'/g, "\\'")}')">📖 Estudar Pauta</button>
-                                    <button class="btn-topic-delete" onclick="deleteTopic('${t.replace(/'/g, "\\'")}')">🗑️</button>
-                                </div>
-                            </div>
-                        `).join('');
-                    }
-                }
+                renderTopicsList(data.topics);
 
                 const newSignature = getFeedSignature(data, selectedAgentFilter);
                 const currentPostsCount = (data.posts || []).length;
@@ -2509,10 +2497,43 @@
             }
         }
 
-        async function addNewTopic() {
+        function renderTopicsList(topics) {
+            const topicsList = document.getElementById('topics-list');
+            if (!topicsList) return;
+            if (!topics || topics.length === 0) {
+                topicsList.innerHTML = '<div style="color: #8c7665; font-style: italic; padding: 1.2rem; text-align: center;">Nenhuma pauta cadastrada. Digite uma pauta no campo acima para fixá-la como pauta central de estudo.</div>';
+                return;
+            }
+            topicsList.innerHTML = topics.map((t, idx) => {
+                const escaped = t.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+                const activeBadge = idx === 0
+                    ? `<span style="background: #22543d; color: #fff; font-size: 0.78rem; padding: 0.2rem 0.55rem; border-radius: 4px; margin-left: 0.6rem; font-weight: 700; vertical-align: middle;">🔥 PAUTA ATIVA (#1)</span>`
+                    : '';
+                return `
+                    <div class="topic-card" style="${idx === 0 ? 'border: 2px solid #22543d; background: #f8fff9;' : ''}">
+                        <div class="topic-title-text">📌 ${t} ${activeBadge}</div>
+                        <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+                            <button type="button" class="btn-topic-action" onclick="runStudyCycle('${escaped}')">📖 Estudar Pauta</button>
+                            <button type="button" class="btn-topic-delete" onclick="deleteTopic('${escaped}')">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function addNewTopic(andRunCycle = false) {
             const input = document.getElementById('new-topic-input');
-            const topic = input.value.strip ? input.value.strip() : input.value.trim();
-            if (!topic) return;
+            const topic = input && (input.value.strip ? input.value.strip() : input.value.trim());
+            if (!topic) {
+                alert("Por favor, digite o título ou tema da pauta no campo de texto.");
+                if (input) input.focus();
+                return;
+            }
+
+            const btnSave = document.getElementById('btn-save-topic');
+            const btnLaunch = document.getElementById('btn-launch-topic');
+            if (btnSave) btnSave.disabled = true;
+            if (btnLaunch) btnLaunch.disabled = true;
 
             try {
                 const res = await fetch('/api/topics/add', {
@@ -2521,23 +2542,63 @@
                     body: JSON.stringify({ topic })
                 });
                 const data = await res.json();
+                if (!res.ok || data.error) {
+                    alert(data.error || "Erro ao salvar pauta.");
+                    return;
+                }
+
                 input.value = '';
-                switchTab('feed');
-                await loadData(true);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                if (currentDbData) {
+                    currentDbData.topics = data.topics || [topic];
+                }
+                renderTopicsList(data.topics || [topic]);
+                renderQuickTopics(data.topics || [topic]);
+
+                const heroTopicEl = document.getElementById('hero-active-topic');
+                if (heroTopicEl) heroTopicEl.innerText = topic;
+                const heroVerseEl = document.getElementById('hero-active-verse');
+                if (heroVerseEl && data.active_verse_text) {
+                    heroVerseEl.innerText = data.active_verse_ref
+                        ? `"${data.active_verse_text}" (${data.active_verse_ref})`
+                        : `"${data.active_verse_text}"`;
+                }
+
+                const fb = document.getElementById('topic-save-feedback');
+                if (fb) {
+                    fb.innerText = `✅ Pauta "${topic}" salva com sucesso e fixada no topo (#1) como Pauta Central!`;
+                    fb.style.display = 'block';
+                    setTimeout(() => { if (fb) fb.style.display = 'none'; }, 6000);
+                }
+                showToastMessage(`📌 Pauta "${topic}" salva e fixada como Pauta Central!`);
+
+                if (andRunCycle) {
+                    await runStudyCycle(topic);
+                } else {
+                    await loadData(false);
+                }
             } catch (err) {
+                console.error("Erro ao adicionar pauta:", err);
                 alert("Erro ao adicionar pauta.");
+            } finally {
+                if (btnSave) btnSave.disabled = false;
+                if (btnLaunch) btnLaunch.disabled = false;
             }
         }
 
         async function deleteTopic(topic) {
             if (!confirm(`Deseja remover a pauta "${topic}"?`)) return;
             try {
-                await fetch('/api/topics/delete', {
+                const res = await fetch('/api/topics/delete', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ topic })
                 });
+                const data = await res.json();
+                if (data.topics) {
+                    if (currentDbData) currentDbData.topics = data.topics;
+                    renderTopicsList(data.topics);
+                    renderQuickTopics(data.topics);
+                }
                 await loadData(true);
             } catch (err) {
                 alert("Erro ao remover pauta.");
@@ -2570,7 +2631,7 @@
             }
             toast.innerText = msg;
             toast.style.display = 'inline-flex';
-            setTimeout(() => { if (toast) toast.remove(); }, 3500);
+            setTimeout(() => { if (toast) toast.remove(); }, 4500);
         }
 
         async function shutdownServer() {
@@ -2590,13 +2651,49 @@
         }
 
         async function runStudyCycle(specificTopic = null, specificAgentId = null) {
-            if (isCycleInProgress) return;
-            isCycleInProgress = true;
-            const btn = document.querySelector('.btn-trigger');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerText = specificAgentId ? '⏳ Redigindo Tratado...' : '⏳ Pesquisando & Debatendo...';
+            // 1. Se uma pauta específica foi solicitada, SALVA E FIXA IMEDIATAMENTE antes mesmo do ciclo!
+            if (specificTopic) {
+                try {
+                    const addRes = await fetch('/api/topics/add', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ topic: specificTopic })
+                    });
+                    const addData = await addRes.json();
+                    if (addData.topics) {
+                        if (currentDbData) currentDbData.topics = addData.topics;
+                        renderTopicsList(addData.topics);
+                        renderQuickTopics(addData.topics);
+                    }
+                    const heroTopicEl = document.getElementById('hero-active-topic');
+                    if (heroTopicEl) heroTopicEl.innerText = specificTopic;
+                } catch (e) {
+                    console.warn("Aviso ao pré-fixar pauta:", e);
+                }
             }
+
+            if (isCycleInProgress) {
+                showToastMessage(specificTopic
+                    ? `📌 Pauta "${specificTopic}" salva no topo! Aguardando término do estudo atual...`
+                    : `⏳ Já existe um tratado sendo redigido neste instante. Aguarde concluir!`);
+                return;
+            }
+
+            isCycleInProgress = true;
+            switchTab('feed');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            const heroBtn = document.getElementById('btn-hero-action');
+            if (heroBtn) {
+                heroBtn.disabled = true;
+                heroBtn.innerText = specificAgentId
+                    ? '⏳ Teólogo Redigindo Tratado...'
+                    : (specificTopic ? `⏳ Redigindo Tratado sobre "${specificTopic}"...` : '⏳ Pesquisando & Debatendo...');
+            }
+            showToastMessage(specificTopic
+                ? `⏳ Gerando tratado teológico sobre a pauta "${specificTopic}"...`
+                : '⏳ Iniciando novo tratado e debate teológico...');
+
             try {
                 const res = await fetch('/api/run_cycle', {
                     method: 'POST',
@@ -2607,19 +2704,19 @@
                 if (result.error && specificTopic) {
                     alert(result.error);
                 } else {
-                    switchTab('feed');
                     dismissNewPostsToast();
                     pendingNewData = null;
                     await loadData(true);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
+                    showToastMessage('✨ Novo Tratado Teológico publicado e salvo no acervo!');
                 }
             } catch (err) {
                 console.error("Erro no ciclo:", err);
             } finally {
                 isCycleInProgress = false;
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerText = '✨ Executar Ciclo de Estudo';
+                if (heroBtn) {
+                    heroBtn.disabled = false;
+                    heroBtn.innerText = '⚡ Iniciar Novo Tratado & Debate Autônomo';
                 }
             }
         }
