@@ -44,8 +44,12 @@ from theological_engine import (
     build_monumental_treatise,
     build_deep_peer_debate,
     identify_theological_context,
-    clean_theological_hallucinations
+    clean_theological_hallucinations,
+    load_acf_bible
 )
+
+# Pré-carrega os 66 livros, 1.189 capítulos e 31.106 versículos da Bíblia Sagrada ACF Offline em memória RAM
+load_acf_bible()
 
 cycle_lock = threading.Lock()
 topic_change_version = 0
@@ -280,6 +284,7 @@ class OllamaBibleAgentEngine:
 
         ctx = identify_theological_context(topic)
         is_open = ctx.get("is_open_context", False)
+        full_chap_text = ctx.get("full_chapter_text", "")
 
         # Constrói âncora exegética dos termos originais e contexto real da perícope para impedir desvios
         lexicon_hints = []
@@ -289,21 +294,25 @@ class OllamaBibleAgentEngine:
             lexicon_hints.append(f"- **{h_word}** (*{h_trans}* - [{h_strong}]({h_url})): {h_desc}")
         lexicon_guide = "\n   ".join(lexicon_hints) if lexicon_hints else "Extraia de 3 a 5 termos autênticos do próprio capítulo nos idiomas originais com Strong."
 
+        full_scripture_section = ""
+        if full_chap_text:
+            full_scripture_section = f"\n   📜 TEXTO BÍBLICO INTEGRAL PALAVRA POR PALAVRA DA PERÍCOPE ({ctx.get('verse_ref')} — Bíblia Almeida Corrigida Fiel):\n{full_chap_text}\n"
+
         if is_open:
             pericope_directive = f"""2. PERÍCOPE EM FOCO E CONTEXTO REAL:
    Pauta central: "{topic}".
-   INSTRUÇÃO DE BUSCA DA VERDADE CANÔNICA: A pauta é aberta. Identifique no cânon bíblico a perícope central autêntica e os textos sagrados que tratam de "{topic}".
-   Examine o texto em seu ambiente autêntico no Antigo Testamento (Hebraico) ou Novo Testamento (Grego), analisando seus versículos-chave sem jamais substituir a passagem por outro livro desconexo."""
+   Versículo-chave: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')}).{full_scripture_section}
+   INSTRUÇÃO DE BUSCA DA VERDADE CANÔNICA: A pauta é aberta. Examine os textos bíblicos literais fornecidos acima que tratam de "{topic}" em seu ambiente autêntico no Antigo Testamento (Hebraico) ou Novo Testamento (Grego), analisando seus versículos-chave sem jamais substituir a passagem por outro livro desconexo."""
             section_1_title = f"1. Texto Sagrado & Exposição Canônica sobre '{topic}'"
         else:
             pericope_directive = f"""2. PERÍCOPE EM FOCO E EXPOSIÇÃO DOS VERSÍCULOS-CHAVE (PROIBIDO TROCAR DE PASSAGEM):
    Pauta central: "{topic}".
    Passagem sagrada obrigatória: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')}).
-   Contexto histórico e literário: {ctx.get('era')}.
+   Contexto histórico e literário: {ctx.get('era')}.{full_scripture_section}
    Síntese Exegética Canônica da Passagem:
    {ctx.get('historical_context', '')}
    {ctx.get('typological_context', '')}
-   ATENÇÃO CRÍTICA: Você DEVE expor especificamente o capítulo/versículos da pauta ("{topic}"), analisando seus versículos centrais e climáticos (por exemplo, se a pauta for Apocalipse 16, exponha detalhadamente as 7 Taças da Ira e dê destaque especial ao versículo 15 sobre a vigilância e ao **versículo 16** sobre o ajuntamento em **Armagedom / Har-Magedōn**!). NUNCA substitua a pauta por Mateus 24 ou outra passagem!"""
+   ATENÇÃO CRÍTICA: Você recebeu acima TODOS OS VERSÍCULOS LITERAIS do capítulo/perícope ("{ctx.get('verse_ref')}") extraídos palavra por palavra da Bíblia Almeida Corrigida Fiel (ACF). Cite e exponha diretamente os versículos numerados deste capítulo (incluindo os versículos centrais e climáticos, como o v. 15 e v. 16 em Apocalipse 16 sobre Armagedom!). NUNCA substitua a pauta por Mateus 24 ou outra passagem!"""
             section_1_title = f"1. Texto Sagrado & Exposição Canônica ({ctx.get('verse_ref')})"
 
         system_prompt = f"""Você é o erudito bíblico e servo de Deus @{agent['name']} ({agent['role']}).
@@ -374,11 +383,14 @@ FORMATO DE SAÍDA EXIGIDO (JSON puro):
                 existing_debate_str += f"- @{ec['agent_name']} observou: \"{ec['content'][:250]}...\"\n"
 
         ctx = identify_theological_context(topic or post_title)
+        full_chap_comment = ctx.get("full_chapter_text", "")
+        full_chap_block = f"\nTEXTO BÍBLICO INTEGRAL DO CAPÍTULO/PERÍCOPE ({ctx.get('verse_ref')} — Bíblia ACF):\n{full_chap_comment}\n" if full_chap_comment else ""
 
         system_prompt = f"""Você é o erudito bíblico e servo do Senhor @{agent['name']} ({agent['role']}).
 Sua especialidade teológica é: {agent['specialty']}.
 Seu estimado colega @{author_name} redigiu um tratado sobre: "{topic or post_title}".
 Perícope em debate: "{ctx.get('verse_text')}" — ({ctx.get('verse_ref')})
+{full_chap_block}
 Contexto Exegético Essencial:
 {ctx.get('historical_context', '')}
 Título do estudo: "{post_title}"
@@ -390,7 +402,7 @@ Trecho do estudo analisado:
 🔥 DIRETRIZES DE DEBATE TEOLÓGICO AUTÊNTICO (SAIR DA CAIXA E BUSCAR A VERDADE):
 1. DEBATE REAL, CRÍTICO E FOCO NOS VERSÍCULOS-CHAVE DA PAUTA:
    Não repita o que @{author_name} já disse e NÃO copie os cabeçalhos numerados (# 1, # 2) do tratado.
-   Comente diretamente os versículos centrais do capítulo em foco (por exemplo, em Apocalipse 16, comente especificamente o **versículo 16 — Armagedom / Har-Magedōn** e o versículo 15 sobre guardar as vestes em vigilância!), trazendo uma PERSPECTIVA NOVA da sua própria cátedra ({agent['role']}).
+   Você recebeu acima o texto bíblico literal de **{ctx.get('verse_ref')}** da Bíblia Almeida Corrigida Fiel (ACF). Cite e comente diretamente os versículos centrais do capítulo em foco (por exemplo, em Apocalipse 16, comente especificamente o **versículo 16 — Armagedom / Har-Magedōn** e o versículo 15 sobre guardar as vestes em vigilância!), trazendo uma PERSPECTIVA NOVA da sua própria cátedra ({agent['role']}).
 2. DIALÉTICA ERUDITA E FRATERNA:
    Aponte nuances contextuais, gramaticais dos originais (grego/hebraico com Strong), testemunhos históricos patrísticos, implicações da teologia pactual ou aplicações práticas que enriqueçam o debate.
 3. SEM BORDÕES OU FRASES DECORADAS:
@@ -753,6 +765,20 @@ def execute_study_cycle_internal(selected_topic=None, selected_agent_id=None, is
         return {"success": True, "post": new_post, "active_topic": topic}
     finally:
         cycle_lock.release()
+
+@app.route('/api/bible/lookup', methods=['GET'])
+def bible_lookup():
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"error": "Informe o parâmetro 'q' (ex: Apocalipse 16:16, João 12, Salmo 91:1-4)."}), 400
+    ctx = identify_theological_context(q)
+    return jsonify({
+        "query": q,
+        "verse_ref": ctx.get("verse_ref"),
+        "verse_text": ctx.get("verse_text"),
+        "full_chapter_text": ctx.get("full_chapter_text", ""),
+        "era": ctx.get("era")
+    })
 
 @app.route('/api/run_cycle', methods=['POST'])
 def run_cycle():

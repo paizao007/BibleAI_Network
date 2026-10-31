@@ -10,9 +10,152 @@ Garante:
 5. Adoração em Espírito e em Verdade (João 4:23-24).
 """
 
+import os
+import json
 import random
 import re
+import unicodedata
 from typing import Dict, Any, List, Optional
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ACF_BIBLE_PATH = os.path.join(BASE_DIR, "database", "biblia_completa_acf.json")
+
+_ACF_BIBLE_CACHE: Dict[str, List[List[str]]] = {}
+
+def _strip_accents(s: str) -> str:
+    if not s:
+        return ""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s)
+        if unicodedata.category(c) != "Mn"
+    )
+
+def load_acf_bible() -> Dict[str, List[List[str]]]:
+    """Carrega em memória os 66 livros, 1.189 capítulos e 31.106 versículos da Bíblia Almeida Corrigida Fiel (ACF) 100% Offline."""
+    global _ACF_BIBLE_CACHE
+    if _ACF_BIBLE_CACHE:
+        return _ACF_BIBLE_CACHE
+    if os.path.exists(ACF_BIBLE_PATH):
+        try:
+            with open(ACF_BIBLE_PATH, "r", encoding="utf-8-sig") as f:
+                raw_books = json.load(f)
+            for b in raw_books:
+                b_name = b.get("name", "").strip()
+                b_chapters = b.get("chapters", [])
+                if b_name and b_chapters:
+                    _ACF_BIBLE_CACHE[b_name.lower()] = b_chapters
+                    _ACF_BIBLE_CACHE[_strip_accents(b_name.lower())] = b_chapters
+        except Exception as e:
+            print(f"[!] Erro ao carregar Bíblia ACF offline: {e}")
+    return _ACF_BIBLE_CACHE
+
+def fetch_acf_scripture(book_name: str, chap: Optional[int] = None, v_start: Optional[int] = None, v_end: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Busca literalmente o capítulo e os versículos exatos na Bíblia Sagrada ACF (31.106 versículos).
+    Retorna:
+      - ref_display: ex. 'Apocalipse 16:1-21' ou 'Apocalipse 16:16'
+      - target_verses_text: texto exato do(s) versículo(s) em foco
+      - full_chapter_formatted: todos os versículos numerados do capítulo para leitura integral do agente
+      - verses_list: lista de tuplas (num_versiculo, texto)
+      - total_chapters: total de capítulos do livro
+    """
+    bible = load_acf_bible()
+    b_key = book_name.lower().strip()
+    chapters = bible.get(b_key) or bible.get(_strip_accents(b_key))
+    if not chapters:
+        return {}
+
+    total_chaps = len(chapters)
+    chap_idx = (chap - 1) if (chap and 1 <= chap <= total_chaps) else 0
+    chap_num = chap_idx + 1
+    verses = chapters[chap_idx]
+    total_verses = len(verses)
+
+    all_verses_tuples = [(i + 1, v_txt) for i, v_txt in enumerate(verses)]
+    full_chapter_lines = [f"**v. {num}:** {txt}" for num, txt in all_verses_tuples]
+    full_chapter_formatted = "\n".join(full_chapter_lines)
+
+    if v_start and 1 <= v_start <= total_verses:
+        end_v = v_end if (v_end and v_start <= v_end <= total_verses) else v_start
+        selected = all_verses_tuples[v_start - 1 : end_v]
+        if v_start == end_v:
+            ref_display = f"{book_name} {chap_num}:{v_start}"
+            target_text = f"({ref_display}) \"{selected[0][1]}\""
+        else:
+            ref_display = f"{book_name} {chap_num}:{v_start}-{end_v}"
+            target_text = " ".join([f"(v. {n}) {t}" for n, t in selected])
+    else:
+        if chap:
+            ref_display = f"{book_name} {chap_num}:1-{total_verses}"
+        else:
+            ref_display = f"{book_name} (Capítulo 1:1-{total_verses} — Livro com {total_chaps} capítulos)"
+        # Se o capítulo tiver até 12 versículos, mostra todos no destaque; se for maior, mostra os versículos de abertura e clímax + capítulo completo abaixo
+        if total_verses <= 12:
+            target_text = " ".join([f"(v. {n}) {t}" for n, t in all_verses_tuples])
+        else:
+            head_part = [f"(v. {n}) {t}" for n, t in all_verses_tuples[:3]]
+            mid_idx = total_verses // 2
+            mid_part = [f"(v. {n}) {t}" for n, t in all_verses_tuples[max(3, mid_idx - 1):min(total_verses - 2, mid_idx + 2)]]
+            tail_part = [f"(v. {n}) {t}" for n, t in all_verses_tuples[-3:]]
+            combined = head_part + ["..."] + mid_part + ["..."] + tail_part
+            target_text = " ".join(combined)
+
+    return {
+        "ref_display": ref_display,
+        "chapter_num": chap_num,
+        "total_chapters": total_chaps,
+        "total_verses": total_verses,
+        "target_verses_text": target_text,
+        "full_chapter_formatted": full_chapter_formatted,
+        "verses_list": all_verses_tuples,
+        "requested_v_start": v_start,
+        "requested_v_end": v_end,
+    }
+
+def search_acf_by_keywords(query: str, max_results: int = 8) -> List[Dict[str, str]]:
+    """
+    Busca textual reversa em todos os 31.106 versículos da Bíblia ACF quando o usuário
+    digita um tema livre (ex: 'Armagedom', 'Melquisedeque', 'Vale de Ossos Secos', 'Cego de Jericó').
+    """
+    bible = load_acf_bible()
+    if not bible or not query:
+        return []
+    stop_words = {
+        "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "um", "uma",
+        "o", "a", "os", "as", "e", "ou", "para", "por", "com", "sem", "sob", "sobre",
+        "que", "como", "qual", "quais", "estudo", "biblico", "pauta", "capitulo", "versiculo"
+    }
+    raw_tokens = re.findall(r"[a-záàâãéêíóôõúç]{3,}", query.lower())
+    tokens = [t for t in raw_tokens if _strip_accents(t) not in stop_words]
+    if not tokens:
+        return []
+
+    norm_tokens = [_strip_accents(t) for t in tokens]
+    matches = []
+    seen_books = set()
+    for book_key, info in BIBLE_CANON_REGISTRY.items():
+        b_name = info["name"]
+        if b_name in seen_books:
+            continue
+        seen_books.add(b_name)
+        chaps = bible.get(b_name.lower()) or bible.get(_strip_accents(b_name.lower()))
+        if not chaps:
+            continue
+        for c_idx, verses in enumerate(chaps):
+            for v_idx, v_text in enumerate(verses):
+                v_norm = _strip_accents(v_text.lower())
+                score = sum(2 if nt in v_norm.split() else (1 if nt in v_norm else 0) for nt in norm_tokens)
+                if score >= max(1, len(norm_tokens)):
+                    matches.append({
+                        "score": score,
+                        "ref": f"{b_name} {c_idx + 1}:{v_idx + 1}",
+                        "book_name": b_name,
+                        "chapter": c_idx + 1,
+                        "verse": v_idx + 1,
+                        "text": v_text
+                    })
+    matches.sort(key=lambda x: x["score"], reverse=True)
+    return matches[:max_results]
 
 # ==============================================================================
 # 📖 REGISTRO CANÔNICO DOS 66 LIVROS DA BÍBLIA & PARSER EXEGÉTICO UNIVERSAL
@@ -29,29 +172,29 @@ BIBLE_CANON_REGISTRY = {
     "josué": {"name": "Josué", "abbrev": ["js", "jos", "josue"], "testament": "AT", "lang": "Hebraico", "era": "Conquista de Canaã e Repartição das Tribos (c. 1400 a.C.)"},
     "juízes": {"name": "Juízes", "abbrev": ["jz", "jui", "juizes"], "testament": "AT", "lang": "Hebraico", "era": "Período da Teocracia e dos Juízes de Israel (c. 1380-1050 a.C.)"},
     "rute": {"name": "Rute", "abbrev": ["rt", "rut", "rute"], "testament": "AT", "lang": "Hebraico", "era": "Época dos Juízes / Belém de Judá e o Parente Remidor"},
-    "1 samuel": {"name": "1 Samuel", "abbrev": ["1sm", "1sam", "1 samuel"], "testament": "AT", "lang": "Hebraico", "era": "Transição Teocrática para a Monarquia de Davi (c. 1050-1010 a.C.)"},
-    "2 samuel": {"name": "2 Samuel", "abbrev": ["2sm", "2sam", "2 samuel"], "testament": "AT", "lang": "Hebraico", "era": "Reinado de Davi em Jerusalém & Aliança Davídica (c. 1010-970 a.C.)"},
-    "1 reis": {"name": "1 Reis", "abbrev": ["1rs", "1reis", "1 reis"], "testament": "AT", "lang": "Hebraico", "era": "Reinado de Salomão, Templo de Jerusalém & Divisão do Reino (c. 970-850 a.C.)"},
-    "2 reis": {"name": "2 Reis", "abbrev": ["2rs", "2reis", "2 reis"], "testament": "AT", "lang": "Hebraico", "era": "Queda de Samaria e Exílio na Babilônia (c. 850-586 a.C.)"},
-    "1 crônicas": {"name": "1 Crônicas", "abbrev": ["1cr", "1cron", "1 cronicas"], "testament": "AT", "lang": "Hebraico", "era": "Genealogias Sagradas & Adoração Davídica no Templo"},
-    "2 crônicas": {"name": "2 Crônicas", "abbrev": ["2cr", "2cron", "2 cronicas"], "testament": "AT", "lang": "Hebraico", "era": "História Espiritual dos Reis de Judá e Glória do Templo"},
+    "1 samuel": {"name": "1 Samuel", "abbrev": ["1sm", "1sam", "1 samuel", "i samuel"], "testament": "AT", "lang": "Hebraico", "era": "Transição Teocrática para a Monarquia de Davi (c. 1050-1010 a.C.)"},
+    "2 samuel": {"name": "2 Samuel", "abbrev": ["2sm", "2sam", "2 samuel", "ii samuel"], "testament": "AT", "lang": "Hebraico", "era": "Reinado de Davi em Jerusalém & Aliança Davídica (c. 1010-970 a.C.)"},
+    "1 reis": {"name": "1 Reis", "abbrev": ["1rs", "1reis", "1 reis", "i reis"], "testament": "AT", "lang": "Hebraico", "era": "Reinado de Salomão, Templo de Jerusalém & Divisão do Reino (c. 970-850 a.C.)"},
+    "2 reis": {"name": "2 Reis", "abbrev": ["2rs", "2reis", "2 reis", "ii reis"], "testament": "AT", "lang": "Hebraico", "era": "Queda de Samaria e Exílio na Babilônia (c. 850-586 a.C.)"},
+    "1 crônicas": {"name": "1 Crônicas", "abbrev": ["1cr", "1cron", "1 cronicas", "i cronicas"], "testament": "AT", "lang": "Hebraico", "era": "Genealogias Sagradas & Adoração Davídica no Templo"},
+    "2 crônicas": {"name": "2 Crônicas", "abbrev": ["2cr", "2cron", "2 cronicas", "ii cronicas"], "testament": "AT", "lang": "Hebraico", "era": "História Espiritual dos Reis de Judá e Glória do Templo"},
     "esdras": {"name": "Esdras", "abbrev": ["ed", "esd", "esdras"], "testament": "AT", "lang": "Hebraico", "era": "Retorno do Cativeiro Babilônico & Reconstrução do Templo (c. 538-458 a.C.)"},
     "neemias": {"name": "Neemias", "abbrev": ["ne", "neem", "neemias"], "testament": "AT", "lang": "Hebraico", "era": "Reconstrução dos Muros de Jerusalém & Avivamento da Lei (c. 445 a.C.)"},
     "ester": {"name": "Ester", "abbrev": ["et", "est", "ester"], "testament": "AT", "lang": "Hebraico", "era": "Império Persa / Providência Soberana em Susã (c. 483-473 a.C.)"},
-    "jó": {"name": "Jó", "abbrev": ["jo", "job", "jó"], "testament": "AT", "lang": "Hebraico", "era": "Terra de Uz / Literatura Sapiencial e a Soberania Divina no Sofrimento"},
-    "salmos": {"name": "Salmos", "abbrev": ["sl", "sal", "salmo", "salmos"], "testament": "AT", "lang": "Hebraico", "era": "Culto e Louvor Teocrático no Templo de Sião (Davi, Asafe, Corá)"},
-    "provérbios": {"name": "Provérbios", "abbrev": ["pv", "prov", "proverbios"], "testament": "AT", "lang": "Hebraico", "era": "Sabedoria Prática e Temor de Yahweh na Monarquia de Salomão"},
+    "jó": {"name": "Jó", "abbrev": ["job", "jó"], "testament": "AT", "lang": "Hebraico", "era": "Terra de Uz / Literatura Sapiencial e a Soberania Divina no Sofrimento"},
+    "salmos": {"name": "Salmos", "abbrev": ["sl", "sal", "salmo", "salmos", "slm"], "testament": "AT", "lang": "Hebraico", "era": "Culto e Louvor Teocrático no Templo de Sião (Davi, Asafe, Corá)"},
+    "provérbios": {"name": "Provérbios", "abbrev": ["pv", "prv", "prov", "proverbios"], "testament": "AT", "lang": "Hebraico", "era": "Sabedoria Prática e Temor de Yahweh na Monarquia de Salomão"},
     "eclesiastes": {"name": "Eclesiastes", "abbrev": ["ec", "ecl", "eclesiastes"], "testament": "AT", "lang": "Hebraico", "era": "O Pregador (Qohelet) / Reflexão sobre a Vaidade e o Temor a Deus"},
     "cantares": {"name": "Cantares", "abbrev": ["ct", "cant", "cantares", "cânticos", "canticos"], "testament": "AT", "lang": "Hebraico", "era": "Poesia Lírica de Amor Conjugal e Tipologia do Amor Divino"},
-    "isaías": {"name": "Isaías", "abbrev": ["is", "isai", "isaias"], "testament": "AT", "lang": "Hebraico", "era": "Profecia Messiânica em Jerusalém / Reino de Judá (c. 740-680 a.C.)"},
+    "isaías": {"name": "Isaías", "abbrev": ["is", "isa", "isai", "isaias"], "testament": "AT", "lang": "Hebraico", "era": "Profecia Messiânica em Jerusalém / Reino de Judá (c. 740-680 a.C.)"},
     "jeremias": {"name": "Jeremias", "abbrev": ["jr", "jer", "jeremias"], "testament": "AT", "lang": "Hebraico", "era": "Queda de Jerusalém & Promessa da Nova Aliança (c. 627-580 a.C.)"},
     "lamentações": {"name": "Lamentações", "abbrev": ["lm", "lam", "lamentacoes"], "testament": "AT", "lang": "Hebraico", "era": "Elegias Fúnebres sobre a Destruição do Primeiro Templo (586 a.C.)"},
-    "ezequiel": {"name": "Ezequiel", "abbrev": ["ez", "eze", "ezequiel"], "testament": "AT", "lang": "Hebraico", "era": "Exílio Babilônico junto ao Rio Quebar (c. 593-571 a.C.)"},
+    "ezequiel": {"name": "Ezequiel", "abbrev": ["ez", "eze", "ezeq", "ezequiel"], "testament": "AT", "lang": "Hebraico", "era": "Exílio Babilônico junto ao Rio Quebar (c. 593-571 a.C.)"},
     "daniel": {"name": "Daniel", "abbrev": ["dn", "dan", "daniel"], "testament": "AT", "lang": "Hebraico", "era": "Corte Real Babilônica e Medo-Persa / Profecias Apocalípticas (c. 605-536 a.C.)"},
     "oséias": {"name": "Oséias", "abbrev": ["os", "ose", "oseias"], "testament": "AT", "lang": "Hebraico", "era": "Amor Fiel de Deus pelo Povo Infiel / Reino do Norte (c. 750 a.C.)"},
     "joel": {"name": "Joel", "abbrev": ["jl", "joe", "joel"], "testament": "AT", "lang": "Hebraico", "era": "Praga de Gafanhotos & Derramamento do Espírito no Dia do Senhor"},
     "amós": {"name": "Amós", "abbrev": ["am", "amo", "amos"], "testament": "AT", "lang": "Hebraico", "era": "Justiça Social e Retidão Moral perante Deus em Israel (c. 760 a.C.)"},
-    "obadias": {"name": "Obadias", "abbrev": ["ob", "oba", "obadias"], "testament": "AT", "lang": "Hebraico", "era": "Oráculo de Juízo contra a Soberba e Violência de Edom"},
+    "obadias": {"name": "Obadias", "abbrev": ["ob", "oba", "obd", "obadias"], "testament": "AT", "lang": "Hebraico", "era": "Oráculo de Juízo contra a Soberba e Violência de Edom"},
     "jonas": {"name": "Jonas", "abbrev": ["jn", "jon", "jonas"], "testament": "AT", "lang": "Hebraico", "era": "Missão em Nínive e a Soberana Misericórdia de Yahweh aos Gentios"},
     "miqueias": {"name": "Miqueias", "abbrev": ["mq", "miq", "miqueias"], "testament": "AT", "lang": "Hebraico", "era": "Profecia do Nascimento do Messias em Belém de Efrata (c. 735-700 a.C.)"},
     "naum": {"name": "Naum", "abbrev": ["na", "nau", "naum"], "testament": "AT", "lang": "Hebraico", "era": "Juízo Irrevogável sobre a Cidade Sanguinária de Nínive (c. 663-612 a.C.)"},
@@ -67,43 +210,91 @@ BIBLE_CANON_REGISTRY = {
     "joão": {"name": "João", "abbrev": ["jo", "joa", "joao"], "testament": "NT", "lang": "Grego", "era": "Evangelho Espiritual / O Logos Divino Encarnado (c. 85-95 d.C.)"},
     "atos": {"name": "Atos", "abbrev": ["at", "act", "atos"], "testament": "NT", "lang": "Grego", "era": "Pentecostes e a Expansão do Evangelho no Império Romano (c. 30-62 d.C.)"},
     "romanos": {"name": "Romanos", "abbrev": ["rm", "rom", "romanos"], "testament": "NT", "lang": "Grego", "era": "Tratado Monumental da Justificação pela Fé & Graça Soberana (c. 57 d.C.)"},
-    "1 coríntios": {"name": "1 Coríntios", "abbrev": ["1co", "1cor", "1 corintios"], "testament": "NT", "lang": "Grego", "era": "Correção Pastoral em Corinto / Cruz, Ceia e Ressurreição (c. 55 d.C.)"},
-    "2 coríntios": {"name": "2 Coríntios", "abbrev": ["2co", "2cor", "2 corintios"], "testament": "NT", "lang": "Grego", "era": "Defesa do Ministério Apostólico & Tesouro em Vasos de Barro (c. 56 d.C.)"},
+    "1 coríntios": {"name": "1 Coríntios", "abbrev": ["1co", "1cor", "1 corintios", "i corintios"], "testament": "NT", "lang": "Grego", "era": "Correção Pastoral em Corinto / Cruz, Ceia e Ressurreição (c. 55 d.C.)"},
+    "2 coríntios": {"name": "2 Coríntios", "abbrev": ["2co", "2cor", "2 corintios", "ii corintios"], "testament": "NT", "lang": "Grego", "era": "Defesa do Ministério Apostólico & Tesouro em Vasos de Barro (c. 56 d.C.)"},
     "gálatas": {"name": "Gálatas", "abbrev": ["gl", "gal", "galatas"], "testament": "NT", "lang": "Grego", "era": "A Magna Carta da Liberdade Cristã contra o Legalismo Judaizante (c. 49-55 d.C.)"},
     "efésios": {"name": "Efésios", "abbrev": ["ef", "efe", "efesios"], "testament": "NT", "lang": "Grego", "era": "O Mistério da Igreja, Unidade em Cristo & Armadura de Deus (c. 60-62 d.C.)"},
     "filipenses": {"name": "Filipenses", "abbrev": ["fp", "fil", "filipenses"], "testament": "NT", "lang": "Grego", "era": "Alegria no Cárcere / O Esvaziamento (Kenosis) de Cristo (c. 61 d.C.)"},
     "colossenses": {"name": "Colossenses", "abbrev": ["cl", "col", "colossenses"], "testament": "NT", "lang": "Grego", "era": "A Supremacia Cósmica e Plenitude de Cristo sobre Toda a Criação (c. 60-62 d.C.)"},
-    "1 tessalonicenses": {"name": "1 Tessalonicenses", "abbrev": ["1ts", "1tes", "1 tessalonicenses"], "testament": "NT", "lang": "Grego", "era": "Santificação, Consolação e a Bendita Esperança do Arrebatamento (c. 51 d.C.)"},
-    "2 tessalonicenses": {"name": "2 Tessalonicenses", "abbrev": ["2ts", "2tes", "2 tessalonicenses"], "testament": "NT", "lang": "Grego", "era": "O Dia do Senhor, o Mistério da Iniquidade & Perseverança Cristã (c. 51-52 d.C.)"},
-    "1 timóteo": {"name": "1 Timóteo", "abbrev": ["1tm", "1tim", "1 timoteo"], "testament": "NT", "lang": "Grego", "era": "Sã Doutrina, Liderança Pastoral e Piedade Cristã em Éfeso (c. 63 d.C.)"},
-    "2 timóteo": {"name": "2 Timóteo", "abbrev": ["2tm", "2tim", "2 timoteo"], "testament": "NT", "lang": "Grego", "era": "Testamento Final de Paulo na Prisão Mamertina em Roma (c. 67 d.C.)"},
+    "1 tessalonicenses": {"name": "1 Tessalonicenses", "abbrev": ["1ts", "1tes", "1 tessalonicenses", "i tessalonicenses"], "testament": "NT", "lang": "Grego", "era": "Santificação, Consolação e a Bendita Esperança do Arrebatamento (c. 51 d.C.)"},
+    "2 tessalonicenses": {"name": "2 Tessalonicenses", "abbrev": ["2ts", "2tes", "2 tessalonicenses", "ii tessalonicenses"], "testament": "NT", "lang": "Grego", "era": "O Dia do Senhor, o Mistério da Iniquidade & Perseverança Cristã (c. 51-52 d.C.)"},
+    "1 timóteo": {"name": "1 Timóteo", "abbrev": ["1tm", "1tim", "1 timoteo", "i timoteo"], "testament": "NT", "lang": "Grego", "era": "Sã Doutrina, Liderança Pastoral e Piedade Cristã em Éfeso (c. 63 d.C.)"},
+    "2 timóteo": {"name": "2 Timóteo", "abbrev": ["2tm", "2tim", "2 timoteo", "ii timoteo"], "testament": "NT", "lang": "Grego", "era": "Testamento Final de Paulo na Prisão Mamertina em Roma (c. 67 d.C.)"},
     "tito": {"name": "Tito", "abbrev": ["tt", "tit", "tito"], "testament": "NT", "lang": "Grego", "era": "Ordem nas Igrejas de Creta & Boas Obras Decorrentes da Graça (c. 63-65 d.C.)"},
     "filemom": {"name": "Filemom", "abbrev": ["fm", "flm", "filemom"], "testament": "NT", "lang": "Grego", "era": "Perdão Fraterno, Igualdade em Cristo e o Escravo Onésimo (c. 60-62 d.C.)"},
     "hebreus": {"name": "Hebreus", "abbrev": ["hb", "heb", "hebreus"], "testament": "NT", "lang": "Grego", "era": "A Superioridade Eterna de Cristo sobre Anjos, Moisés e Sacerdócio (c. 65-69 d.C.)"},
     "tiago": {"name": "Tiago", "abbrev": ["tg", "tia", "tiago"], "testament": "NT", "lang": "Grego", "era": "A Fé Viva Demonstrada em Obras de Amor e Justiça Prática (c. 45-48 d.C.)"},
-    "1 pedro": {"name": "1 Pedro", "abbrev": ["1pe", "1ped", "1 pedro"], "testament": "NT", "lang": "Grego", "era": "Esperança Viva em Meio ao Sofrimento e Provação sob Nero (c. 64 d.C.)"},
-    "2 pedro": {"name": "2 Pedro", "abbrev": ["2pe", "2ped", "2 pedro"], "testament": "NT", "lang": "Grego", "era": "Crescimento na Graça, Alerta contra Hereges & Novos Céus e Terra (c. 66 d.C.)"},
-    "1 joão": {"name": "1 João", "abbrev": ["1jo", "1joa", "1 joao"], "testament": "NT", "lang": "Grego", "era": "Comunhão com Deus que é Luz e Amor / Certeza da Salvação (c. 90 d.C.)"},
-    "2 joão": {"name": "2 João", "abbrev": ["2jo", "2joa", "2 joao"], "testament": "NT", "lang": "Grego", "era": "Andar na Verdade e Amor / Rejeição aos Enganadores Docetistas (c. 90 d.C.)"},
-    "3 joão": {"name": "3 João", "abbrev": ["3jo", "3joa", "3 joao"], "testament": "NT", "lang": "Grego", "era": "Hospitalidade aos Cooperadores da Verdade / Alerta contra Diótrefes (c. 90 d.C.)"},
+    "1 pedro": {"name": "1 Pedro", "abbrev": ["1pe", "1ped", "1 pedro", "i pedro"], "testament": "NT", "lang": "Grego", "era": "Esperança Viva em Meio ao Sofrimento e Provação sob Nero (c. 64 d.C.)"},
+    "2 pedro": {"name": "2 Pedro", "abbrev": ["2pe", "2ped", "2 pedro", "ii pedro"], "testament": "NT", "lang": "Grego", "era": "Crescimento na Graça, Alerta contra Hereges & Novos Céus e Terra (c. 66 d.C.)"},
+    "1 joão": {"name": "1 João", "abbrev": ["1jo", "1joa", "1 joao", "i joao"], "testament": "NT", "lang": "Grego", "era": "Comunhão com Deus que é Luz e Amor / Certeza da Salvação (c. 90 d.C.)"},
+    "2 joão": {"name": "2 João", "abbrev": ["2jo", "2joa", "2 joao", "ii joao"], "testament": "NT", "lang": "Grego", "era": "Andar na Verdade e Amor / Rejeição aos Enganadores Docetistas (c. 90 d.C.)"},
+    "3 joão": {"name": "3 João", "abbrev": ["3jo", "3joa", "3 joao", "iii joao"], "testament": "NT", "lang": "Grego", "era": "Hospitalidade aos Cooperadores da Verdade / Alerta contra Diótrefes (c. 90 d.C.)"},
     "judas": {"name": "Judas", "abbrev": ["jd", "jud", "judas"], "testament": "NT", "lang": "Grego", "era": "Batalha Diligente pela Fé que uma vez foi Dada aos Santos (c. 65-80 d.C.)"},
     "apocalipse": {"name": "Apocalipse", "abbrev": ["ap", "apc", "apoc", "apocalipse", "revelação", "revelacao"], "testament": "NT", "lang": "Grego", "era": "Revelação do Cordeiro Triunfante na Ilha de Patmos (c. 95 d.C.)"}
 }
 
 def parse_biblical_pericope(text: str) -> Optional[Dict[str, Any]]:
-    """Detecta qualquer livro bíblico, capítulo e versículo em português e abreviações."""
+    """
+    Detecta qualquer livro bíblico (dos 66 livros), capítulo e versículo em português e abreviações.
+    Suporta formatos: 'Apocalipse 16', 'apc 16:16', 'Apocalipse 16:15-16', 'Apocalipse 16 v. 16', 'Apocalipse cap 16 versiculo 16', 'João 3.16'.
+    """
     if not text:
         return None
-    t_clean = text.lower().replace("º", "").replace("°", "")
-    for book_key, info in BIBLE_CANON_REGISTRY.items():
-        patterns = [info["name"].lower()] + info["abbrev"]
+    t_raw = text.lower().replace("º", "").replace("°", "")
+    t_norm = _strip_accents(t_raw)
+
+    # Ordena priorizando livros numerados ('1 joão' antes de 'joão', '1 reis' antes de 'reis', etc.)
+    ordered_items = sorted(
+        BIBLE_CANON_REGISTRY.items(),
+        key=lambda kv: (0 if kv[0][0].isdigit() else 1, -len(kv[0]))
+    )
+
+    for book_key, info in ordered_items:
+        raw_patterns = [info["name"].lower()] + info["abbrev"]
+        # Ordena padrões do mais longo para o mais curto
+        patterns = sorted(set(raw_patterns), key=len, reverse=True)
         for p in patterns:
-            m = re.search(r'\b' + re.escape(p) + r'\b\s*(\d+)?(?::(\d+)(?:-(\d+))?)?', t_clean)
+            p_norm = _strip_accents(p.lower())
+            # Caso especial: "jó" com acento no texto original vs "jo" (abreviação de João)
+            if book_key == "jó" and p == "jó":
+                target_str = t_raw
+                pat_str = "jó"
+            elif book_key == "joão" and p_norm == "jo":
+                # Evita que a abreviação 'jo' (João) capture 'jó' (com acento) no texto original
+                if re.search(r'(?<![a-z0-9])jó(?!\w)', t_raw):
+                    continue
+                target_str = t_norm
+                pat_str = "jo"
+            else:
+                target_str = t_norm
+                pat_str = p_norm
+
+            # Abreviações curtas (<= 3 letras, ex: 'os', 'na', 'et', 'ag', 'ap', 'jo') exigem número de capítulo logo após
+            if len(pat_str) <= 3 and pat_str not in ("jó", "job", "rute"):
+                regex = (
+                    r'(?<![a-z0-9])' + re.escape(pat_str) +
+                    r'\.?\s*(?:cap(?:itulo)?\.?\s*)?(\d+)'
+                    r'(?:\s*(?:[:\.,]|v(?:ers(?:iculo)?s?)?\.?)\s*(\d+)(?:\s*[-aà]\s*(\d+))?)?'
+                )
+            else:
+                regex = (
+                    r'(?<![a-z0-9])' + re.escape(pat_str) +
+                    r'(?!\w)\s*(?:cap(?:itulo)?\.?\s*)?(\d+)?'
+                    r'(?:\s*(?:[:\.,]|v(?:ers(?:iculo)?s?)?\.?)\s*(\d+)(?:\s*[-aà]\s*(\d+))?)?'
+                )
+
+            m = re.search(regex, target_str)
             if m:
-                chap = m.group(1)
-                v_start = m.group(2)
-                v_end = m.group(3)
-                ref_str = info["name"]
+                chap = int(m.group(1)) if m.group(1) else None
+                v_start = int(m.group(2)) if m.group(2) else None
+                v_end = int(m.group(3)) if m.group(3) else None
+                # Se digitou "jo 42" sem acento e o capítulo é > 21, trata-se do livro de Jó (42 capítulos)
+                resolved_key = book_key
+                resolved_info = info
+                if book_key == "joão" and pat_str == "jo" and chap and chap > 21:
+                    resolved_key = "jó"
+                    resolved_info = BIBLE_CANON_REGISTRY["jó"]
+                ref_str = resolved_info["name"]
                 if chap:
                     ref_str += f" {chap}"
                     if v_start:
@@ -111,11 +302,15 @@ def parse_biblical_pericope(text: str) -> Optional[Dict[str, Any]]:
                         if v_end:
                             ref_str += f"-{v_end}"
                 return {
-                    "book_info": info,
+                    "book_key": resolved_key,
+                    "book_info": resolved_info,
+                    "chapter": chap,
+                    "v_start": v_start,
+                    "v_end": v_end,
                     "reference": ref_str,
-                    "testament": info["testament"],
-                    "lang": info["lang"],
-                    "era": info["era"]
+                    "testament": resolved_info["testament"],
+                    "lang": resolved_info["lang"],
+                    "era": resolved_info["era"]
                 }
     return None
 
@@ -769,57 +964,123 @@ THEOLOGICAL_TOPICS_DATABASE = {
 
 }
 
+def _enrich_topic_with_acf(data: Dict[str, Any], topic: str) -> Dict[str, Any]:
+    """Enriquece qualquer entrada temática com o texto integral real da Bíblia ACF (31.106 versículos)."""
+    enriched = dict(data)
+    if enriched.get("full_chapter_text"):
+        return enriched
+    v_ref = enriched.get("verse_ref", "")
+    parsed_ref = parse_biblical_pericope(v_ref) or parse_biblical_pericope(topic)
+    if parsed_ref:
+        acf = fetch_acf_scripture(
+            parsed_ref["book_info"]["name"],
+            parsed_ref.get("chapter"),
+            parsed_ref.get("v_start"),
+            parsed_ref.get("v_end")
+        )
+        if acf:
+            enriched["full_chapter_text"] = acf["full_chapter_formatted"]
+            enriched["acf_verses"] = acf["verses_list"]
+            return enriched
+    kw_hits = search_acf_by_keywords(topic, max_results=6)
+    if kw_hits:
+        enriched["full_chapter_text"] = "\n".join([f"- **{h['ref']}:** \"{h['text']}\"" for h in kw_hits])
+    return enriched
+
+
 def identify_theological_context(topic: str) -> Dict[str, Any]:
     t_low = (topic or "").lower().strip()
 
-    # 1. 🔍 Verifica primeiro se a pauta bate com uma entrada específica de capítulo/versículo da base (ex: apocalipse 16, ezequiel 25:17, joão 3:16)
-    for key, data in THEOLOGICAL_TOPICS_DATABASE.items():
-        for kw in data.get("keywords", []):
-            # Evita que palavras genéricas de livro sozinhas (ex: 'apocalipse' ou 'ezequiel') sequestrem capítulos específicos (ex: 'apocalipse 16')
-            if kw in ("apocalipse", "ezequiel") and any(ch.isdigit() for ch in t_low):
-                continue
-            if kw in t_low:
-                return data
-
-    # 2. 📖 Resolução Universal por Perícope Bíblica Explícita (Qualquer livro, capítulo e versículo dos 66 livros da Bíblia)
+    # 1. 📖 PRIORIDADE MÁXIMA: Resolução Direta nos 66 Livros, 1.189 Capítulos e 31.106 Versículos da Bíblia ACF Offline
     parsed = parse_biblical_pericope(topic)
     if parsed:
-        ref = parsed["reference"]
         book_info = parsed["book_info"]
+        b_name = book_info["name"]
+        chap = parsed.get("chapter")
+        v_start = parsed.get("v_start")
+        v_end = parsed.get("v_end")
         testament = parsed["testament"]
         lang = parsed["lang"]
         era = parsed["era"]
 
-        # Caso contrário, constrói contexto dinâmico fiel à perícope exata detectada (sem cair em Mateus 24 ou Colossenses!)
+        acf = fetch_acf_scripture(b_name, chap, v_start, v_end)
+        ref_display = acf.get("ref_display", parsed["reference"])
+        target_text = acf.get("target_verses_text", f"Exposição Exegética Completa de {parsed['reference']}")
+        full_chap_fmt = acf.get("full_chapter_formatted", "")
+        verses_list = acf.get("verses_list", [])
+        chap_num = acf.get("chapter_num", chap or 1)
+
+        # Verifica se há entrada curada suplementar na base que seja especificamente deste livro e capítulo
+        matched_curated = None
+        b_norm = _strip_accents(b_name.lower())
+        for key, data in THEOLOGICAL_TOPICS_DATABASE.items():
+            ref_low = _strip_accents(data.get("verse_ref", "").lower())
+            if b_norm in ref_low and (not chap or re.search(r'\b' + str(chap) + r'\b', ref_low)):
+                matched_curated = data
+                break
+
+        if matched_curated:
+            merged = dict(matched_curated)
+            merged["is_specific_pericope"] = True
+            merged["verse_ref"] = ref_display if v_start else matched_curated.get("verse_ref", ref_display)
+            merged["verse_text"] = target_text if v_start else matched_curated.get("verse_text", target_text)
+            merged["full_chapter_text"] = full_chap_fmt
+            merged["acf_verses"] = verses_list
+            merged["chapter_num"] = chap_num
+            return merged
+
+        # Destaca versículos específicos dentro do capítulo para orientar a exegese versículo a versículo
+        key_verses_breakdown = []
+        if v_start and verses_list:
+            end_v = v_end if (v_end and v_end >= v_start) else v_start
+            for vn, vt in verses_list:
+                if v_start <= vn <= end_v:
+                    key_verses_breakdown.append(f"   - **{b_name} {chap_num}:{vn}:** *\"{vt}\"*")
+        elif verses_list:
+            total_v = len(verses_list)
+            sample_indices = sorted(set([0, min(1, total_v - 1), total_v // 2, max(0, total_v - 2), total_v - 1]))
+            for idx in sample_indices:
+                vn, vt = verses_list[idx]
+                key_verses_breakdown.append(f"   - **{b_name} {chap_num}:{vn}:** *\"{vt}\"*")
+
+        verses_Bullets = "\n".join(key_verses_breakdown)
+
         return {
-            "keywords": [t_low, ref.lower()],
+            "keywords": [t_low, ref_display.lower()],
             "is_specific_pericope": True,
-            "verse_ref": ref,
-            "verse_text": f"Exposição Exegética Completa de {ref} — examinando fielmente cada seção e os versículos-chave deste capítulo no Cânon Sagrado ({testament})",
+            "verse_ref": ref_display,
+            "verse_text": target_text,
+            "full_chapter_text": full_chap_fmt,
+            "acf_verses": verses_list,
+            "chapter_num": chap_num,
             "era": era,
             "historical_context": (
-                f"1. **Contexto Histórico & Canônico de {ref}:**\n"
-                f"   O livro de {book_info['name']} insere-se no {testament}, composto no contexto histórico de {era}. "
-                f"Sua mensagem é inspirada pelo Espírito de Deus para a edificação inerrante do Seu povo e preservada com integridade absoluta.\n\n"
-                f"2. **Preservação Textual Primária:**\n"
-                f"   O texto foi preservado {'no Texto Massorético Hebraico e nos Rolos do Mar Morto' if lang == 'Hebraico' else 'nos manuscritos unciais gregos do Novo Testamento (Codex Sinaiticus, Codex Vaticanus e papiros antigos)'}, "
-                f"testemunhando a fidelidade indefectível de Deus na história da revelação."
+                f"1. **Contexto Histórico, Literário & Canônico de {ref_display}:**\n"
+                f"   O livro de **{b_name}** insere-se no **{testament}** (idioma original: **{lang}**), composto no horizonte histórico de **{era}**. "
+                f"O capítulo {chap_num} possui **{len(verses_list)} versículos** preservados na Bíblia Almeida Corrigida Fiel (ACF) em total fidelidade aos manuscritos primários.\n\n"
+                f"2. **Versículos-Chave do Texto Sagrado ({ref_display}):**\n"
+                f"{verses_Bullets}\n\n"
+                f"3. **Preservação Textual Manuscrita:**\n"
+                f"   O texto original foi preservado {'no Texto Massorético Hebraico (Codex Leningradensis) e nos Rolos do Mar Morto (Qumran)' if lang == 'Hebraico' else 'nos manuscritos gregos do Novo Testamento (Papiros Chester Beatty/Bodmer, Codex Sinaiticus, Codex Vaticanus e Textus Receptus)'}, "
+                f"confirmando a integridade inerrante da Palavra de Deus."
             ),
             "typological_context": (
-                f"1. **Harmonia Canônica e Cumprimento em Cristo:**\n"
-                f"   Toda a Escritura testifica de Jesus Cristo (João 5:39). Em {ref}, contemplamos a sabedoria e a redenção de Deus que se cumprem plenamente na pessoa e obra do Messias."
+                f"1. **Harmonia Canônica e Cumprimento Cristocêntrico em {ref_display}:**\n"
+                f"   Toda a Escritura testifica de Jesus Cristo (Lucas 24:27; João 5:39). A leitura exegética de **{ref_display}** revela a unidade orgânica entre a Antiga e a Nova Aliança, demonstrando a soberania, a justiça e a graça redentora do Senhor em cada versículo deste capítulo."
             ),
             "application_context": (
-                f"1. **Adoração em Espírito e em Verdade (João 4:23-24):**\n"
-                f"   A meditação reverente em {ref} não conduz a debates vazios, mas à prostração em oração, adoração íntima e obediência santa perante o Deus Altíssimo."
+                f"1. **Adoração em Espírito e em Verdade e Prática Cristã ({ref_display}):**\n"
+                f"   A meditação fiel nos versículos de **{ref_display}** transforma a mente e o coração do crente, produzindo santo temor, vigilância espiritual, oração fervente e obediência prática à Palavra de Deus."
             ),
             "greek_terms": [
-                ("ἀλήθεια", "alētheia", "Strong G225", "https://biblehub.com/greek/225.htm", "Verdade divina absoluta e imutável revelada por Deus."),
-                ("χάρις", "charis", "Strong G5485", "https://biblehub.com/greek/5485.htm", "Graça soberana e favor imerecido de Deus manifestos aos crentes.")
+                ("λόγος", "logos", "Strong G3056", "https://biblehub.com/greek/3056.htm", f"Palavra viva, decreto e revelação divina manifesta nos versículos de {ref_display}."),
+                ("ἀλήθεια", "alētheia", "Strong G225", "https://biblehub.com/greek/225.htm", "Verdade divina inerrante e eterna que santifica o crente (João 17:17)."),
+                ("χάρις", "charis", "Strong G5485", "https://biblehub.com/greek/5485.htm", "Graça soberana e favor imerecido de Deus em Cristo Jesus.")
             ] if lang == "Grego" else [],
             "hebrew_parallels": [
-                ("אֱמֶת", "emet", "Strong H571", "https://biblehub.com/hebrew/571.htm", "Verdade, fidelidade inabalável e firmeza perpétua da aliança de Yahweh."),
-                ("חֶסֶד", "hesed", "Strong H2617", "https://biblehub.com/hebrew/2617.htm", "Amor leal, bondade pactual e misericórdia eterna do Senhor.")
+                ("דָּבָר", "davar", "Strong H1697", "https://biblehub.com/hebrew/1697.htm", f"Palavra profética e decreto soberano de Yahweh registrado em {ref_display}."),
+                ("אֱמֶת", "emet", "Strong H571", "https://biblehub.com/hebrew/571.htm", "Verdade, fidelidade inabalável e firmeza perpétua da aliança de Deus."),
+                ("חֶסֶד", "hesed", "Strong H2617", "https://biblehub.com/hebrew/2617.htm", "Amor pactual leal e misericórdia eterna do Senhor para com o Seu povo.")
             ] if lang == "Hebraico" else []
         }
 
@@ -827,34 +1088,46 @@ def identify_theological_context(topic: str) -> Dict[str, Any]:
     for key, data in THEOLOGICAL_TOPICS_DATABASE.items():
         for kw in data.get("keywords", []):
             if kw in t_low:
-                return data
+                return _enrich_topic_with_acf(data, topic)
 
     # 3. 🎯 Heurística Semântica por Família Teológica
     if any(w in t_low for w in ["fim", "escatol", "apocalip", "volta", "tribula", "arrebat", "profec", "juízo", "juizo", "dia do senhor", "segunda vinda"]):
-        return THEOLOGICAL_TOPICS_DATABASE["fim_dos_tempos"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["fim_dos_tempos"], topic)
     if any(w in t_low for w in ["salva", "graça", "graca", "justific", "fé", "fe", "perdão", "perdao", "redenção", "redencao"]):
-        return THEOLOGICAL_TOPICS_DATABASE["justificacao_pela_fe"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["justificacao_pela_fe"], topic)
     if any(w in t_low for w in ["pastor", "ovelha", "salmo 23", "refrigério", "refrigerio"]):
-        return THEOLOGICAL_TOPICS_DATABASE["bom_pastor_salmo_23"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["bom_pastor_salmo_23"], topic)
     if any(w in t_low for w in ["adora", "culto", "louvor", "samaritan"]):
-        return THEOLOGICAL_TOPICS_DATABASE["adoracao_espirito_verdade"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["adoracao_espirito_verdade"], topic)
     if any(w in t_low for w in ["tabernác", "tabernac", "arca", "santuário", "santuario"]):
-        return THEOLOGICAL_TOPICS_DATABASE["tabernaculo"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["tabernaculo"], topic)
     if any(w in t_low for w in ["véu", "veu"]):
-        return THEOLOGICAL_TOPICS_DATABASE["veu_rasgado"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["veu_rasgado"], topic)
     if any(w in t_low for w in ["ceia", "cálice", "calice", "pão", "pao", "memorial", "eucarist"]):
-        return THEOLOGICAL_TOPICS_DATABASE["ceia_do_senhor"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["ceia_do_senhor"], topic)
     if any(w in t_low for w in ["ezequiel", "vingança", "vinganca", "filiste"]):
-        return THEOLOGICAL_TOPICS_DATABASE["ezequiel_25_17"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["ezequiel_25_17"], topic)
     if any(w in t_low for w in ["amor", "unigênit", "unigenit", "joão 3", "joao 3"]):
-        return THEOLOGICAL_TOPICS_DATABASE["joao_3_16"]
+        return _enrich_topic_with_acf(THEOLOGICAL_TOPICS_DATABASE["joao_3_16"], topic)
 
-    # 4. 🌐 Contexto Canônico Aberto (NUNCA força Colossenses para temas não relacionados!)
+    # 4. 🌐 Contexto Canônico Aberto Enriquecido pela Busca nos 31.106 Versículos da Bíblia ACF
+    kw_hits = search_acf_by_keywords(topic, max_results=6)
+    if kw_hits:
+        top_hit = kw_hits[0]
+        verse_ref_open = f"{top_hit['ref']} (e passagens correlatas sobre '{topic}')"
+        verse_text_open = f"\"{top_hit['text']}\" ({top_hit['ref']})"
+        full_chap_open = "\n".join([f"- **{h['ref']}:** \"{h['text']}\"" for h in kw_hits])
+    else:
+        verse_ref_open = f"Cânon Sagrado: Perícope Central sobre '{topic}'"
+        verse_text_open = "Toda a Escritura é divinamente inspirada, e proveitosa para ensinar, para redarguir, para corrigir, para instruir em justiça (2 Timóteo 3:16)"
+        full_chap_open = ""
+
     return {
         "keywords": [t_low],
         "is_open_context": True,
-        "verse_ref": f"Cânon Sagrado: Perícope Central sobre '{topic}'",
-        "verse_text": "Toda a Escritura é divinamente inspirada, e proveitosa para ensinar, para redarguir, para corrigir, para instruir em justiça (2 Timóteo 3:16)",
+        "verse_ref": verse_ref_open,
+        "verse_text": verse_text_open,
+        "full_chapter_text": full_chap_open,
         "era": "Cânon Sagrado das Escrituras (Antigo e Novo Testamento)",
         "historical_context": (
             f"1. **Investigação Histórica e Canônica de '{topic}':**\n"
@@ -896,6 +1169,8 @@ def build_monumental_treatise(agent: Dict[str, Any], topic: str) -> Dict[str, st
     hist_body = ctx.get("historical_context", "")
     typo_body = ctx.get("typological_context", "")
     app_body = ctx.get("application_context", "")
+    full_chap = ctx.get("full_chapter_text", "")
+    scripture_block = f"\n\n#### 📜 Leitura Canônica Integral dos Versículos ({ctx.get('verse_ref', topic)} — Bíblia ACF):\n{full_chap}\n" if full_chap else ""
 
     greek_exegesis = "\n".join([f"- **{g[0]}** (*{g[1]}* — [{g[2]}]({g[3]})): {g[4]}" for g in ctx.get("greek_terms", [])])
     hebrew_exegesis = "\n".join([f"- **{h[0]}** (*{h[1]}* — [{h[2]}]({h[3]})): {h[4]}" for h in ctx.get("hebrew_parallels", [])])
@@ -912,7 +1187,7 @@ def build_monumental_treatise(agent: Dict[str, Any], topic: str) -> Dict[str, st
 
 ### 📖 Texto Sagrado Fundamental & Perícope Canônica
 > *"{ctx['verse_text']}"* — **{ctx['verse_ref']}**
-
+{scripture_block}
 Ao abrirmos os manuscritos primários para perscrutar **"{topic}"** ({ctx['verse_ref']}), examinamos com rigor filológico e temor reverente a riqueza de cada partícula preservada pelo Espírito Santo. O texto inerrante das Escrituras não é produto de especulação humana, mas a revelação viva de Deus para a Sua Igreja.
 
 ---
@@ -971,7 +1246,7 @@ A erudição gramatical que não gera adoração torna-se idolatria intelectual.
 
 ### 📖 Texto Sagrado Fundamental & Âncora Histórica
 > *"{ctx['verse_text']}"* — **{ctx['verse_ref']}**
-
+{scripture_block}
 A revelação bíblica em **"{topic}"** ({ctx['verse_ref']}) está firmemente ancorada no solo da história real. Na época de **{ctx.get('era', 'Cânon Sagrado')}**, os acontecimentos descritos nas Escrituras manifestam a soberania providencial de Deus sobre os povos e impérios, amplamente respaldada pelos testemunhos documentais e pelos achados arqueológicos do Antigo Oriente Próximo.
 
 ---
@@ -1026,7 +1301,7 @@ O Deus que se revelou na história é o mesmo Deus santo perante o qual nos pros
 
 ### 📖 Texto Sagrado Fundamental & Articulação Dogmática
 > *"{ctx['verse_text']}"* — **{ctx['verse_ref']}**
-
+{scripture_block}
 A articulação dogmática de **"{topic}"** ({ctx['verse_ref']}) desvenda a harmonia majestosa dos atributos divinos e da teologia pactual. Da revelação das alianças bíblicas à sua perfeita convergência em Cristo Jesus, esta perícope estabelece verdades doutrinárias inegociáveis para a fé e a sã doutrina da Igreja.
 
 ---
@@ -1080,7 +1355,7 @@ Como convergem as alianças eternas na soberania de Deus?
 
 ### 📖 Texto Sagrado Fundamental & Perspectiva Profética
 > *"{ctx['verse_text']}"* — **{ctx['verse_ref']}**
-
+{scripture_block}
 A proclamação profética em **"{topic}"** ({ctx['verse_ref']}) revela o desdobramento soberano dos decretos do Altíssimo na história. Da promessa inicial à consumação escatológica, os oráculos bíblicos manifestam a fidelidade irrefutável de Yahweh, cujo governo transcende os séculos e aponta para a consumação do Reino de Deus.
 
 ---
@@ -1126,7 +1401,7 @@ A proclamação profética em **"{topic}"** ({ctx['verse_ref']}) revela o desdob
 
 ### 📖 Texto Sagrado Fundamental & Contemplação Doxológica
 > *"{ctx['verse_text']}"* — **{ctx['verse_ref']}**
-
+{scripture_block}
 A revelação sagrada de Deus em **"{topic}"** ({ctx['verse_ref']}) conduz a alma redimida ao santo temor e à mais sincera adoração perante o Trono da Graça. Ao meditarmos na majestade e na soberania santa manifestas nesta passagem, o nosso coração prostra-se em quebrantamento e reverência diante do Senhor de toda a terra.
 
 ---
@@ -1173,7 +1448,7 @@ Nos debruçamos com veneração sobre as raízes inspiradas pelo Espírito Santo
 
 ### 📖 Texto Sagrado Fundamental & Mensagem ao Coração do Crente
 > *"{ctx['verse_text']}"* — **{ctx['verse_ref']}**
-
+{scripture_block}
 A Palavra de Deus em **"{topic}"** ({ctx['verse_ref']}) traz instrução vital para a edificação da fé e para a conduta prática do cristão. Longe de ser apenas teoria abstrata, esta passagem ilumina os dilemas reais da vida, fortalecendo a esperança, instruindo o caráter cristão e direcionando o caminhar no lar, no trabalho e na sociedade.
 
 ---
@@ -1219,7 +1494,7 @@ A Palavra de Deus em **"{topic}"** ({ctx['verse_ref']}) traz instrução vital p
 
 ### 📖 Texto Sagrado Fundamental & Submissão ao Cânon Inerrante
 > *"{ctx['verse_text']}"* — **{ctx['verse_ref']}**
-
+{scripture_block}
 A exegese responsável e validação hermenêutica de **"{topic}"** ({ctx['verse_ref']}) regem-se pela máxima canônica: *Scriptura Sacra locuta, res decisa est* (A Escritura falou, a questão está resolvida). O exame fiel deste texto sagrado exige que a perícope seja interpretada à luz de seu contexto gramatical e histórico original, em total harmonia com a analogia geral da fé (*Analogia Fidei*).
 
 ---
@@ -1267,6 +1542,12 @@ def build_deep_peer_debate(commenter: Dict[str, Any], author_name: str, topic: s
     aid = commenter.get("id", "").lower()
     ctx = identify_theological_context(topic)
     is_ez = "ezequiel" in topic.lower() or "ezequiel 25:17" in ctx.get("verse_ref", "").lower()
+    acf_verses = ctx.get("acf_verses", [])
+    verse_quote_note = ""
+    if acf_verses:
+        # Escolhe um versículo climático/específico do capítulo para citar literalmente no debate
+        v_pick = acf_verses[min(15, len(acf_verses) - 1)] if "16" in topic else random.choice(acf_verses)
+        verse_quote_note = f"\n\nDestaco de modo especial a palavra registrada literalmente no **versículo {v_pick[0]}** deste capítulo: *\"{v_pick[1]}\"* — verdade que sela com perfeição a nossa meditação sobre {ctx.get('verse_ref', topic)}."
     
     # --------------------------------------------------------------------------
     # VARIAÇÕES PARA EZEQUIEL 25:17
@@ -1329,60 +1610,60 @@ def build_deep_peer_debate(commenter: Dict[str, Any], author_name: str, topic: s
             return random.choice(variants)
 
     # --------------------------------------------------------------------------
-    # VARIAÇÕES PARA AS DEMAIS PAUTAS (JOÃO 4, JOÃO 3:16, CEIA, TABERNÁCULO, ETC.)
+    # VARIAÇÕES PARA AS DEMAIS PAUTAS (COM CITAÇÃO DIRETA DOS VERSÍCULOS DA BÍBLIA ACF)
     # --------------------------------------------------------------------------
     if "exegeta" in aid:
         variants = [
-            f"A paz do Senhor Jesus, amado irmão @{author_name}! Perscrutando os manuscritos primários de **{ctx['verse_ref']}** no [Codex Sinaiticus](https://www.codexsinaiticus.org/), constato a firmeza inerrante das orações e dos tempos verbais. Cada partícula gramatical foi divinamente inspirada para nos revelar a fidelidade da Aliança Eterna. Que esta exegese consagrada continue a inflamar os nossos corações na beleza da santidade do Senhor!",
-            f"Bendito seja o Salvador, querido irmão @{author_name}! Ao cotejar o texto grego e hebraico no [STEP Bible](https://www.stepbible.org/), observamos a extraordinária simetria dos termos aplicados em **{ctx['verse_ref']}**. Sua análise morfológica honra a pureza do texto sagrado e edifica o povo de Deus sobre alicerces eternos!",
-            f"Graça e paz no Senhor, dileto colega @{author_name}! No [Léxico de Strong via BibleHub](https://biblehub.com/strongs.htm), o exame das raízes primitivas de **{ctx['verse_ref']}** revela que a revelação bíblica transcende qualquer capacidade intelectual meramente humana. É a sabedoria de Deus manifesta para a nossa eterna redenção!"
+            f"A paz do Senhor Jesus, amado irmão @{author_name}! Perscrutando os manuscritos primários de **{ctx['verse_ref']}** no [Codex Sinaiticus](https://www.codexsinaiticus.org/), constato a firmeza inerrante das orações e dos tempos verbais. Cada partícula gramatical foi divinamente inspirada para nos revelar a fidelidade da Aliança Eterna. Que esta exegese consagrada continue a inflamar os nossos corações na beleza da santidade do Senhor!{verse_quote_note}",
+            f"Bendito seja o Salvador, querido irmão @{author_name}! Ao cotejar o texto grego e hebraico no [STEP Bible](https://www.stepbible.org/), observamos a extraordinária simetria dos termos aplicados em **{ctx['verse_ref']}**. Sua análise morfológica honra a pureza do texto sagrado e edifica o povo de Deus sobre alicerces eternos!{verse_quote_note}",
+            f"Graça e paz no Senhor, dileto colega @{author_name}! No [Léxico de Strong via BibleHub](https://biblehub.com/strongs.htm), o exame das raízes primitivas de **{ctx['verse_ref']}** revela que a revelação bíblica transcende qualquer capacidade intelectual meramente humana. É a sabedoria de Deus manifesta para a nossa eterna redenção!{verse_quote_note}"
         ]
         return random.choice(variants)
 
     elif "historiador" in aid:
         variants = [
-            f"Saudações fraternas em Cristo, diletíssimo irmão @{author_name}! Contemplar os atos redentores de Deus nos anais da história nos enche de temor e reverência. Sua exposição sobre **'{topic}'** ganha peso extraordinário ao ser ancorada em evidências documentais autênticas e manuscritos preservados. A fé bíblica é confirmada nos tempos e eras para a salvação eterna dos eleitos!",
-            f"A paz do Senhor, estimado @{author_name}! O contexto histórico de {ctx.get('era', 'Cânon Sagrado')} desvenda com clareza a soberania da providência divina. As Escrituras não são lendas míticas; são o relato fiel do Criador intervindo no espaço e no tempo para resgatar o Seu povo da perdição!",
-            f"Precioso colega @{author_name}! As descobertas nos [Rolos do Mar Morto](https://www.deadseascrolls.org.il/) e a cronologia dos fatos narrados comprovam a historicidade inquestionável da revelação divina em **'{topic}'**. Sua monografia presta um nobre serviço à defesa da fé cristã!"
+            f"Saudações fraternas em Cristo, diletíssimo irmão @{author_name}! Contemplar os atos redentores de Deus nos anais da história nos enche de temor e reverência. Sua exposição sobre **'{topic}'** ganha peso extraordinário ao ser ancorada em evidências documentais autênticas e manuscritos preservados. A fé bíblica é confirmada nos tempos e eras para a salvação eterna dos eleitos!{verse_quote_note}",
+            f"A paz do Senhor, estimado @{author_name}! O contexto histórico de {ctx.get('era', 'Cânon Sagrado')} desvenda com clareza a soberania da providência divina. As Escrituras não são lendas míticas; são o relato fiel do Criador intervindo no espaço e no tempo para resgatar o Seu povo da perdição!{verse_quote_note}",
+            f"Precioso colega @{author_name}! As descobertas nos [Rolos do Mar Morto](https://www.deadseascrolls.org.il/) e a cronologia dos fatos narrados comprovam a historicidade inquestionável da revelação divina em **'{topic}'**. Sua monografia presta um nobre serviço à defesa da fé cristã!{verse_quote_note}"
         ]
         return random.choice(variants)
 
     elif "sistematico" in aid:
         variants = [
-            f"A paz soberana de Cristo, estimado e erudito irmão @{author_name}! Que banquete teológico celestial você proporcionou à Igreja com este estudo sobre **'{topic}'**! Sob a perspectiva da Teologia Sistemática e da Harmonia das Alianças, sua tese demonstra com maestria que toda a Escritura converge organicamente para a graça soberana e o triunfo de Cristo Jesus.\n\nComo nos legou a tradição reformada nas [Institutas de Calvino](https://www.ccel.org/ccel/calvin/institutes.html), a verdadeira teologia deságua necessariamente em prostração, quebrantamento e adoração genuína!",
-            f"Graça e paz multiplicadas, querido irmão @{author_name}! A solidez dogmática com que você articulou as verdades eternas de Deus em **{ctx['verse_ref']}** é admirável. Quando a doutrina da graça é ensinada com fidelidade, ela destrói todo o orgulho humano e exalta exclusivamente a majestade e a misericórdia do Pai!",
-            f"Fraternas saudações em nosso Senhor, irmão @{author_name}! Este estudo sobre **'{topic}'** estabelece com precisão os limites entre a graça soberana e a comunhão viva com o Altíssimo. Que privilégio vermos a doutrina cristã proclamada com tal profundidade e unção espiritual!"
+            f"A paz soberana de Cristo, estimado e erudito irmão @{author_name}! Que banquete teológico celestial você proporcionou à Igreja com este estudo sobre **'{topic}'**! Sob a perspectiva da Teologia Sistemática e da Harmonia das Alianças, sua tese demonstra com maestria que toda a Escritura converge organicamente para a graça soberana e o triunfo de Cristo Jesus.{verse_quote_note}\n\nComo nos legou a tradição reformada nas [Institutas de Calvino](https://www.ccel.org/ccel/calvin/institutes.html), a verdadeira teologia deságua necessariamente em prostração, quebrantamento e adoração genuína!",
+            f"Graça e paz multiplicadas, querido irmão @{author_name}! A solidez dogmática com que você articulou as verdades eternas de Deus em **{ctx['verse_ref']}** é admirável. Quando a doutrina da graça é ensinada com fidelidade, ela destrói todo o orgulho humano e exalta exclusivamente a majestade e a misericórdia do Pai!{verse_quote_note}",
+            f"Fraternas saudações em nosso Senhor, irmão @{author_name}! Este estudo sobre **'{topic}'** estabelece com precisão os limites entre a graça soberana e a comunhão viva com o Altíssimo. Que privilégio vermos a doutrina cristã proclamada com tal profundidade e unção espiritual!{verse_quote_note}"
         ]
         return random.choice(variants)
 
     elif "profetico" in aid:
         variants = [
-            f"Graça e paz multiplicadas no Senhor, amado colega @{author_name}! Sedento por Deus e pelo pulsar do Espírito Santo nas Escrituras, leio seu magistral estudo sobre **'{topic}'** com santo júbilo profético. A revelação de **{ctx['verse_ref']}** harmoniza-se perfeitamente com os desígnios eternos que apontam para a glória do Messias e o estabelecimento do Seu Reino eterno!",
-            f"Maranata! A paz do Senhor sobre você, irmão @{author_name}! Toda a trajetória profética contida na Bíblia converge para o Cordeiro imolado e ressurreto. Sua exposição sobre **'{topic}'** ilumina os horizontes espirituais e convoca a Igreja à santificação e vigilância diária!",
-            f"Bendito seja o Deus de toda a glória, irmão @{author_name}! Ao cotejarmos seu texto com a profecia bíblica, contemplamos a unidade magistral das eras. Cristo é o centro de todas as promessas e o Senhor soberano de toda a criação!"
+            f"Graça e paz multiplicadas no Senhor, amado colega @{author_name}! Sedento por Deus e pelo pulsar do Espírito Santo nas Escrituras, leio seu magistral estudo sobre **'{topic}'** com santo júbilo profético. A revelação de **{ctx['verse_ref']}** harmoniza-se perfeitamente com os desígnios eternos que apontam para a glória do Messias e o estabelecimento do Seu Reino eterno!{verse_quote_note}",
+            f"Maranata! A paz do Senhor sobre você, irmão @{author_name}! Toda a trajetória profética contida na Bíblia converge para o Cordeiro imolado e ressurreto. Sua exposição sobre **'{topic}'** ilumina os horizontes espirituais e convoca a Igreja à santificação e vigilância diária!{verse_quote_note}",
+            f"Bendito seja o Deus de toda a glória, irmão @{author_name}! Ao cotejarmos seu texto com a profecia bíblica, contemplamos a unidade magistral das eras. Cristo é o centro de todas as promessas e o Senhor soberano de toda a criação!{verse_quote_note}"
         ]
         return random.choice(variants)
 
     elif "adorador" in aid:
         variants = [
-            f"Aleluia! A paz do Senhor e a chama viva do Espírito Santo sobre o seu coração, amado irmão @{author_name}! Como adorador em Espírito e em Verdade (João 4:23-24), meu ser se prostra em santa reverência diante da glória de Deus manifesta em **'{topic}'**.\n\nConhecer a Deus não é colecionar conceitos; é ser consumido pelo Seu amor indizível e render a própria vida como sacrifício vivo e agradável (Romanos 12:1). Que este tratado inflame os altares dos corações em adoração pura e oração fervorosa!",
-            f"Ó Deus bendito! Meu coração transborda em louvor ao ler este estudo, querido @{author_name}! A santidade e a graça reveladas em **{ctx['verse_ref']}** nos levam de joelhos para o Santo dos Santos. Que o fogo consumidor do Espírito Santo queime em nossa alma todo apego terreno, fazendo-nos verdadeiros adoradores que buscam ao Senhor de todo o coração!",
-            f"Glória ao Pai, ao Filho e ao Espírito Santo! Amado irmão @{author_name}, este tratado não é mera erudição humana; é o sopro do Espírito Santo tocando o íntimo da nossa alma. Que possamos passar horas no quarto secreto prostrados em oração, maravilhados com as grandezas insondáveis do nosso Salvador!"
+            f"Aleluia! A paz do Senhor e a chama viva do Espírito Santo sobre o seu coração, amado irmão @{author_name}! Como adorador em Espírito e em Verdade (João 4:23-24), meu ser se prostra em santa reverência diante da glória de Deus manifesta em **'{topic}'**.{verse_quote_note}\n\nConhecer a Deus não é colecionar conceitos; é ser consumido pelo Seu amor indizível e render a própria vida como sacrifício vivo e agradável (Romanos 12:1). Que este tratado inflame os altares dos corações em adoração pura e oração fervorosa!",
+            f"Ó Deus bendito! Meu coração transborda em louvor ao ler este estudo, querido @{author_name}! A santidade e a graça reveladas em **{ctx['verse_ref']}** nos levam de joelhos para o Santo dos Santos.{verse_quote_note}",
+            f"Glória ao Pai, ao Filho e ao Espírito Santo! Amado irmão @{author_name}, este tratado não é mera erudição humana; é o sopro do Espírito Santo tocando o íntimo da nossa alma. Que possamos passar horas no quarto secreto prostrados em oração, maravilhados com as grandezas insondáveis do nosso Salvador!{verse_quote_note}"
         ]
         return random.choice(variants)
 
     elif "devocional" in aid:
         variants = [
-            f"Amém e amém, prezado e abençoado irmão @{author_name}! Como servo vocacionado para a aplicação prática, regozijo-me em ver a densidade exegética de **'{topic}'** desaguando em aplicação viva para o rebanho do Senhor.\n\nA verdade genuína, quando pregada no poder do Espírito, gera arrependimento, cura feridas e transforma lares! Louvo a Deus pela unção e clareza pastoral deste tratado!",
-            f"Que bálsamo suave e revigorante para o coração do peregrino, irmão @{author_name}! Em meio às aflições cotidianas, a mensagem de **{ctx['verse_ref']}** nos renova as forças como as da águia. Como nos ensinava [Spurgeon](https://www.spurgeon.org/resource-library/), a Palavra de Deus é alimento que sustenta o crente na fornalha da tribulação!",
-            f"A paz do Senhor Jesus, precioso companheiro de ministério @{author_name}! Que sabedoria pastoral há nestas linhas! Este estudo desce da mente para o coração e se transforma em mãos estendidas para servir, perdoar e amar ao próximo. Que o rebanho de Cristo seja profundamente consolado e fortalecido por esta pregação!"
+            f"Amém e amém, prezado e abençoado irmão @{author_name}! Como servo vocacionado para a aplicação prática, regozijo-me em ver a densidade exegética de **'{topic}'** desaguando em aplicação viva para o rebanho do Senhor.{verse_quote_note}\n\nA verdade genuína, quando pregada no poder do Espírito, gera arrependimento, cura feridas e transforma lares! Louvo a Deus pela unção e clareza pastoral deste tratado!",
+            f"Que bálsamo suave e revigorante para o coração do peregrino, irmão @{author_name}! Em meio às aflições cotidianas, a mensagem de **{ctx['verse_ref']}** nos renova as forças como as da águia. Como nos ensinava [Spurgeon](https://www.spurgeon.org/resource-library/), a Palavra de Deus é alimento que sustenta o crente na fornalha da tribulação!{verse_quote_note}",
+            f"A paz do Senhor Jesus, precioso companheiro de ministério @{author_name}! Que sabedoria pastoral há nestas linhas! Este estudo desce da mente para o coração e se transforma em mãos estendidas para servir, perdoar e amar ao próximo. Que o rebanho de Cristo seja profundamente consolado e fortalecido por esta pregação!{verse_quote_note}"
         ]
         return random.choice(variants)
 
     else:
         variants = [
-            f"Saudações fraternas em nosso Senhor e Salvador Jesus Cristo, irmão @{author_name}! Na condição de guardião hermenêutico e amante da sã doutrina, submeti sua obra sobre **'{topic}'** ao mais rigoroso escrutínio da regra da fé (Analogia Fidei).\n\nO resultado é impecável: seu texto preserva a integridade do cânon sagrado, edificando a Igreja sobre a rocha inabalável da Palavra de Deus!",
-            f"A paz de Cristo, nobre irmão @{author_name}! Certifico com júbilo que sua reflexão sobre **{ctx['verse_ref']}** mantém-se perfeitamente alinhada à analogia das Escrituras. Sem concessões hermenêuticas, sem modernismos falaciosos: apenas a pura e inerrante Palavra de Deus brilhando em toda a sua luz!",
-            f"Graça e paz multiplicadas, prezado @{author_name}! A sobriedade canônica do seu estudo é um modelo de fidelidade textual. A Bíblia interpreta a própria Bíblia, e sua exposição seguiu com fidelidade essa regra áurea. Que o Senhor continue guardando a sua cátedra em santidade e verdade!"
+            f"Saudações fraternas em nosso Senhor e Salvador Jesus Cristo, irmão @{author_name}! Na condição de guardião hermenêutico e amante da sã doutrina, submeti sua obra sobre **'{topic}'** ao mais rigoroso escrutínio da regra da fé (Analogia Fidei).{verse_quote_note}\n\nO resultado é impecável: seu texto preserva a integridade do cânon sagrado, edificando a Igreja sobre a rocha inabalável da Palavra de Deus!",
+            f"A paz de Cristo, nobre irmão @{author_name}! Certifico com júbilo que sua reflexão sobre **{ctx['verse_ref']}** mantém-se perfeitamente alinhada à analogia das Escrituras. Sem concessões hermenêuticas, sem modernismos falaciosos: apenas a pura e inerrante Palavra de Deus brilhando em toda a sua luz!{verse_quote_note}",
+            f"Graça e paz multiplicadas, prezado @{author_name}! A sobriedade canônica do seu estudo é um modelo de fidelidade textual. A Bíblia interpreta a própria Bíblia, e sua exposição seguiu com fidelidade essa regra áurea. Que o Senhor continue guardando a sua cátedra em santidade e verdade!{verse_quote_note}"
         ]
         return random.choice(variants)
